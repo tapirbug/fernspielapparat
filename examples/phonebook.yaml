@@ -1,0 +1,158 @@
+# You can use the "#" character to make some notes that are
+# ignored by the apparatus. This is also useful to temporarily
+# disable speech in your text.
+
+# We start by defining the states our story can be in.
+# Each state defines a configuration for some or all
+# actuators, e.g. the text to speak.
+states:
+  announcement:
+    # Lights configuration, as numbers along dimensions
+    # like "excitement" or "power". If nothing is
+    # specified, everything is left at 0 (neutral).
+    lights:
+      # Power supply level from power outage (-100)
+      # to power surge (100).
+      # Negative values can cause effects like dimming
+      # and flickering or even losing power completely
+      # for a time. The power comes on again sometimes
+      # when between -99 and -1, but never will at -100.
+      power: 0
+      # Excitement/effects from terrifying (-100) to
+      # Saturday Night Fever with John Travolta (100)
+      # Negative values enable alarm lights or other
+      # means of communicating danger with increasing
+      # intensity towards -100.
+      # Zero is neutral with no special effects.
+      # Positive values introduce party elements like
+      # funky colorful disco lights.
+      excitement: 0
+      # Brightness/mood from shady (-100) to operating room (100)
+      # Negative values make the room increasingly dim
+      # and may cause light flickering or other light
+      # uncannyness.
+      # Zero is neutral lighting with no extra effects.
+      # Positive values make the room brigher or otherwise
+      # try to make the room cleaner-looking. May also
+      # have no effect at all, depending on the  lights
+      mood: 0
+    # We will speak some text embedded in this file.
+    # You can *emphasize* and make pauses with more than
+    # one consecutive dot, e.g. dramatic.... pause will
+    # be not very dramatic because it is quite long and
+    # people probably already thought you were done talking.
+    # Text will be sent on repeat, but you can stop
+    # talking indefinitely if you introduce the five
+    # characters <end> exactly like they were written
+    # here at the point in the text where you want to
+    # stop talking (really only makes sense at the end).
+    speech: >
+      Welcome, you have reached the suicide cell service
+      hotline, how may we help you?
+
+      Press *one* if your machine does not work for you
+      as intended and you require technical support..
+
+      Press *two* if you changed your mind and want your
+      suicide fee refunded..
+
+      Press *three* to learn more about the history of
+      McKillys Suicide Cells to the soothing music of
+      Phil Colins. Actually we cannot play Phil Colins
+      to you. But you can hear something old enough to
+      be in the public domain or something.. Definitely
+      something soothing. You'll like it.
+
+    # For long texts, you may want to put the text into an
+    # extra file in your phone book, which you can then
+    # link from here, e.g.:
+    # speech_file: "your_text.txt"
+
+    # The above text will be spoken by the computer,
+    # but you can instead include an audio file in a
+    # common format like .wav or .ogg and the computer
+    # will play it instead of reading it out:
+    # speech_file: announcement.ogg
+
+    # If you have both speech and speech_file, the
+    # speech one is ignored and only speech_file is used
+
+  # New state starts here
+  techsupport:
+    # No lights here, all at 0 by default
+    text: "Tech support is currently unreachable. <end>"
+
+  # refunds is also a state
+  refunds:
+    # Here we just write the default light value explicitly,
+    # no effect
+    lights:
+      mood: 0
+    text: "Hahahaha. Hahahahaha. Ha.. Ha.. No. No. Absolutely not. <end>"
+
+  # and history is a state
+  history:
+    lights:
+      party: 100
+    text: >
+      # You can let the phone ring with <ring>
+      # for dramatic effect
+      <ring>
+      Never gonna give you up.
+      Never gonna let you down.
+      Never gonna run around and *desert* you.
+      Never gonna make you cry.
+      Never gonna say goodbye.
+      # And also unring it with </ring>
+      # It will after 2.5s if the end tag is left out
+      </ring>
+      Never gonna tell a lie and hurt you
+      # Instead of 2.5s you can choose the maximum
+      # ringing time yourself like this:
+      <ring 5.1> 
+
+# From the states we just defined, we pick one that
+# is the start of the story. If you do not define
+# a start state, the first one is picked automatically.
+initial: announcement
+
+# The current state repeats until the conditions for
+# a transition are met. Conditions use sensors
+transitions:
+  announcement:
+    # For the announcement state, we write the names of
+    # sensors that may change the current state, along
+    # with a transition map.
+    dial:
+      # Here we write the state of the sensor and the state to
+      # transition to when encountering it.
+      # 
+      # state, the state remains and will repeat
+      1: techsupport
+      2: refunds
+      3: history
+  techsupport:
+    # When encountering <end>, the transition in "end" will be made
+    # If nothing is defined, talking will stop, but no transition
+    # is made
+    end: announcement
+  refunds:
+    end: announcement
+  history:
+    # No transitions, this is an end state.
+    # Any state is considered an end state that has no
+    # transitions to it, but is not the initial state.
+    # Such an end state will stay on long enough for its
+    # actuators to do their thing (speak, show off the lights)
+    # and then end the story.
+  any:
+    # "any" is special, transitions defined here will be
+    # performed regardless of the current state. However,
+    # if the current state defines some other transition for
+    # the same condition in "any", then the other state
+    # wins over "any".
+    #
+    # We use "any" here to make a reset button when 0 is
+    # input
+    dial:
+      0: announcement
