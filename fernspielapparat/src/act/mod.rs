@@ -1,9 +1,11 @@
 
 mod act;
+mod actuators;
 pub mod bell;
 pub mod speech;
 
 pub use act::Act;
+pub use actuators::Actuators;
 
 #[cfg(test)]
 mod test {
