@@ -1,4 +1,4 @@
-use crate::dial::Input;
+use crate::sense::dial::Input;
 
 use std::io::{stdin, Read};
 use std::thread;

@@ -2,11 +2,11 @@
 extern crate failure;
 extern crate tavla;
 
-//mod state;
-mod dial;
+mod act;
+mod sense;
 
+use crate::sense::dial::{stdin_dial, Input};
 use tavla::{Voice, Speech};
-use crate::dial::{stdin_dial, Input};
 use std::thread::sleep;
 use std::time::Duration;
 
