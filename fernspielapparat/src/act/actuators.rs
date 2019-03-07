@@ -8,6 +8,7 @@ pub struct Actuators {
     active: Vec<Box<dyn Act>>
 }
 
+#[allow(dead_code)]
 impl Actuators {
     pub fn new() -> Self {
         Actuators {
@@ -15,9 +16,18 @@ impl Actuators {
         }
     }
 
+    pub fn update(&mut self) -> Result<(), Error> {
+        self.active.retain(|a| {
+            let done = a.done().unwrap_or(false);
+            !done
+        });
+        Ok(())
+    }
+
     pub fn transition(&mut self, next_acts: Vec<Box<dyn Act>>) -> Result<(), Error> {
-        let prev_acts = replace(&mut self.active, next_acts);
-        cancel_all(prev_acts)?;
+        cancel_all(&mut self.active)?;
+        self.active.clear();
+        self.active.extend(next_acts);
         Ok(())
     }
 
@@ -44,7 +54,7 @@ impl Actuators {
     }
 }
 
-fn cancel_all(acts: Vec<Box<dyn Act>>) -> Result<(), Error> {
+fn cancel_all(acts: &mut Vec<Box<dyn Act>>) -> Result<(), Error> {
     compound_result(
         acts.into_iter()
             .map(|mut a| a.cancel())

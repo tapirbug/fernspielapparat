@@ -18,7 +18,9 @@ fn main() -> Result<(), tavla::Error> {
     let dial = stdin_dial();
 
     loop {
+        actuators.update()?;
         while let Some(input) = dial.poll() {
+            println!("{:?}", input);
             match input {
                 Input::Digit(_) => {
                     let speech = Box::new(
