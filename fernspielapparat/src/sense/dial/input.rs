@@ -8,15 +8,18 @@ pub enum Input {
     /// A single digit number input in range [0,9].
     Digit(u8),
     PickUp,
-    HangUp
+    HangUp,
 }
 
 impl Input {
-    pub fn digit<N>(number: N) -> Result<Self, Error> where N : Into<i32> {
+    pub fn digit<N>(number: N) -> Result<Self, Error>
+    where
+        N: Into<i32>,
+    {
         let num = number.into();
         match num >= 0 && num < 10 {
-            true  => Ok(Input::Digit(num as u8)),
-            false => Err(Error::DigitOutOfBounds(num))
+            true => Ok(Input::Digit(num as u8)),
+            false => Err(Error::DigitOutOfBounds(num)),
         }
     }
 
@@ -33,7 +36,7 @@ impl Input {
     pub fn value(&self) -> Option<i32> {
         match self {
             Input::Digit(value) => Some(*value as i32),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -44,7 +47,7 @@ mod err {
     #[derive(Debug, Fail)]
     pub enum Error {
         #[fail(display = "digit {} was not in range [0,9]", _0)]
-        DigitOutOfBounds(i32)
+        DigitOutOfBounds(i32),
     }
 }
 
@@ -61,7 +64,7 @@ mod test {
     #[should_panic]
     #[test]
     fn too_high_max_pluse_five() {
-        let input : i32 = (std::u8::MAX as i32) + 5;
+        let input: i32 = (std::u8::MAX as i32) + 5;
         Input::digit(input).unwrap();
     }
 

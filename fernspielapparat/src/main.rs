@@ -1,16 +1,15 @@
-
 extern crate failure;
 extern crate tavla;
 
-mod err;
 mod act;
+mod err;
 mod sense;
 
-use crate::sense::dial::{stdin_dial, Input};
 use crate::act::Actuators;
-use tavla::{Voice, Speech};
+use crate::sense::dial::{stdin_dial, Input};
 use std::thread::sleep;
 use std::time::Duration;
+use tavla::{Speech, Voice};
 
 fn main() -> Result<(), tavla::Error> {
     let mut actuators = Actuators::new();
@@ -24,20 +23,19 @@ fn main() -> Result<(), tavla::Error> {
             match input {
                 Input::Digit(_) => {
                     let speech = Box::new(
-                        voice.speak(format!("You typed _{}_", input.value().unwrap())).unwrap()
+                        voice
+                            .speak(format!("You typed _{}_", input.value().unwrap()))
+                            .unwrap(),
                     );
                     /*actuators.transition_with_makers([
                         ||voice.speak(format!("You typed _{}_", input.value().unwrap())).unwrap()
                     ].iter())?;*/
-                    actuators.transition(
-                        vec![speech]
-                    )?;
-                },
+                    actuators.transition(vec![speech])?;
+                }
                 Input::HangUp => return Ok(()),
                 Input::PickUp => {
-                    voice.speak("You picked up").unwrap()
-                    .await_done()?;
-                },
+                    voice.speak("You picked up").unwrap().await_done()?;
+                }
             }
         }
 
