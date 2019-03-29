@@ -1,9 +1,9 @@
 use err::BellError;
 use failure::Error;
-use crate::act::Act;
 
 pub struct Bell;
 
+/*use crate::act::Act;
 impl Act for Bell {
     fn done(&self) -> Result<bool, Error> {
         Err(BellError::not_installed())
@@ -12,7 +12,7 @@ impl Act for Bell {
     fn cancel(&mut self) -> Result<(), Error> {
         Err(BellError::not_installed())
     }
-}
+}*/
 
 
 mod err {

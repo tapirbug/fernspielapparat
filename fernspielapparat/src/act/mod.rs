@@ -8,7 +8,7 @@ pub use actuators::Actuators;
 
 #[cfg(test)]
 mod test {
-    use crate::act::bell::Bell;
+    //use crate::act::bell::Bell;
     use crate::act::Act;
     use tavla::{any_voice, Voice};
 
@@ -26,7 +26,7 @@ mod test {
     #[test]
     fn make_act_vector() {
         let acts: Vec<Box<dyn Act>> = vec![
-            Box::new(Bell),
+            //Box::new(Bell),
             Box::new(any_voice().unwrap().speak("Heyo!").unwrap()),
         ];
 

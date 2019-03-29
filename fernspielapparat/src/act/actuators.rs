@@ -15,6 +15,7 @@ impl Actuators {
     }
 
     pub fn update(&mut self) -> Result<(), Error> {
+        // remove finished and erring acts
         self.active.retain(|a| {
             let done = a.done().unwrap_or(false);
             !done
