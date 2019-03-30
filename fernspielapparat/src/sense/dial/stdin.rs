@@ -1,12 +1,10 @@
 use crate::sense::dial::Input;
-use crate::sense::{Sense, Error};
-use std::io::{stdin, Read, StdinLock};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::thread;
+use crate::sense::{Error, Sense};
+use std::io::{stdin, Read};
 
 /// A dial that reads from stdin.
 pub struct Stdin {
-    buf: [u8; 1]
+    buf: [u8; 1],
 }
 
 impl Sense for Stdin {
@@ -30,9 +28,7 @@ impl Sense for Stdin {
 impl Stdin {
     /// Locks on stdin.
     pub fn new() -> Stdin {
-        Stdin {
-            buf: [0]
-        }
+        Stdin { buf: [0] }
     }
 }
 

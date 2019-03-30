@@ -1,6 +1,9 @@
 use failure::Error;
 
 pub trait Act {
+    /// Performs per-cycle updates to the act.
+    fn update(&mut self) -> Result<(), Error>;
+
     /// Tries to check if the act has either completed
     /// or been cancelled.
     ///

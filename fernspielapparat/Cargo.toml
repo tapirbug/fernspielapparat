@@ -9,4 +9,5 @@ failure = "0.1.5"
 tavla = { git = "https://github.com/krachzack/tavla.git" }
 i2c-linux = "0.1.2"
 clap = "2.32.0"
-
+log = "0.4"
+cute-log = "1.1.2"

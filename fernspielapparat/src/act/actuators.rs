@@ -1,6 +1,7 @@
 use crate::act::Act;
 use crate::err::compound_result;
 use failure::Error;
+use log::error;
 use std::fmt::Debug;
 use std::mem::replace;
 
@@ -15,11 +16,24 @@ impl Actuators {
     }
 
     pub fn update(&mut self) -> Result<(), Error> {
-        // remove finished and erring acts
+        // First give every act a chance to update
+        let update_errs: Vec<_> = self
+            .active
+            .iter_mut()
+            .map(|a| a.update())
+            .filter_map(Result::err)
+            .collect();
+
+        if !update_errs.is_empty() {
+            error!("Actuator update failures: {:?}", update_errs);
+        }
+
+        // remove finished acts
         self.active.retain(|a| {
             let done = a.done().unwrap_or(false);
             !done
         });
+
         Ok(())
     }
 

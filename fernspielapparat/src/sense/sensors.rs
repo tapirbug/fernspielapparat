@@ -1,6 +1,7 @@
 use crate::sense::dial::Input;
-use crate::sense::{Sense, Error};
+use crate::sense::{Error, Sense};
 use builder::Builder;
+use log::error;
 
 /// Runs senses in the background, making it possible to
 /// poll them without blocking.
@@ -19,9 +20,9 @@ impl Sensors {
         for (idx, sensor) in self.0.iter_mut().enumerate() {
             match sensor.poll() {
                 Err(Error::Fatal(e)) => {
-                    eprintln!("Fatal error on sensor: {}", e);
+                    error!("Giving up on sensor after fatal error: {}", e);
                     removals.push(idx);
-                },
+                }
                 Err(Error::WouldBlock) => (),
                 Ok(input) => {
                     first_input = Some(input);
@@ -39,36 +40,36 @@ impl Sensors {
 }
 
 mod builder {
+    use super::{Sense, Sensors};
     use crate::sense::bg::BackgroundSense;
-    use super::{Sensors, Sense, Error, Input};
 
     pub struct Builder {
-        may_block: Vec<Box<dyn Sense + Send>>
+        may_block: Vec<Box<dyn Sense + Send>>,
     }
 
     impl Builder {
         pub fn new() -> Self {
             Builder {
-                may_block: Vec::new()
+                may_block: Vec::new(),
             }
         }
 
         /// Enables background input via the given sense
         /// that may block.
-        /// 
+        ///
         /// The sense will be invoked from a background
         /// thread that is spawned at build time.
-        pub fn background(mut self, sense: impl Sense + Send + 'static) -> Self
-        {
+        pub fn background(mut self, sense: impl Sense + Send + 'static) -> Self {
             self.may_block.push(Box::new(sense));
             self
         }
 
         pub fn build(self) -> Sensors {
             Sensors(
-                self.may_block.into_iter()
+                self.may_block
+                    .into_iter()
                     .map(BackgroundSense::spawn)
-                    .collect()
+                    .collect(),
             )
         }
     }

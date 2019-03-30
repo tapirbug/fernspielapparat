@@ -1,10 +1,11 @@
 mod act;
 mod actuators;
-//pub mod bell;
+mod ring;
 pub mod speech;
 
 pub use act::Act;
 pub use actuators::Actuators;
+pub use ring::Ring;
 
 #[cfg(test)]
 mod test {

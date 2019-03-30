@@ -1,13 +1,12 @@
+use crate::sense::{dial::Input, Error, Sense};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::thread;
-use crate::sense::{Sense, Error, dial::Input};
 
 pub struct BackgroundSense(Receiver<Result<Input, Error>>);
 
 impl Sense for BackgroundSense {
     fn poll(&mut self) -> Result<Input, Error> {
-        self.0.try_recv()
-            .unwrap_or(Err(Error::WouldBlock))
+        self.0.try_recv().unwrap_or(Err(Error::WouldBlock))
     }
 }
 
@@ -25,13 +24,12 @@ impl BackgroundSense {
 fn keep_polling(mut sense: Box<dyn Sense>, sender: SyncSender<Result<Input, Error>>) {
     loop {
         match sense.poll() {
-            Ok(input) => sender.send(Ok(input))
-                .expect("Could not send input back"),
+            Ok(input) => sender.send(Ok(input)).expect("Could not send input back"),
             Err(Error::WouldBlock) => thread::yield_now(),
             fatal => {
-                sender.send(fatal);
+                sender.send(fatal).unwrap();
                 break;
-            },
+            }
         }
     }
 }
