@@ -1,9 +1,9 @@
-pub mod dial;
-
+mod dial;
 mod bg;
 mod sense;
 mod sensors;
 
+pub use dial::Input;
 pub use sense::{Error, Sense};
 pub use sensors::Sensors;
 

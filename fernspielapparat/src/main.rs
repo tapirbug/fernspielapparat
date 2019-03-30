@@ -12,7 +12,7 @@ mod sense;
 
 use crate::act::{Act, Actuators, Ring};
 use crate::phone::Phone;
-use crate::sense::{dial::Input, init_sensors};
+use crate::sense::{Input, init_sensors};
 use clap::{crate_authors, crate_name, crate_version, App, Arg};
 use failure::Error;
 use log::{debug, error, warn, info, LevelFilter};

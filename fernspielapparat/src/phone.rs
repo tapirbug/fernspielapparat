@@ -1,4 +1,4 @@
-use crate::sense::dial::Input;
+use crate::sense::Input;
 use i2c_linux;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
