@@ -9,6 +9,7 @@ mod act;
 mod err;
 mod phone;
 mod sense;
+mod state;
 
 use crate::act::{Act, Actuators, Ring};
 use crate::phone::Phone;
@@ -98,7 +99,7 @@ fn launch_runtime() -> Result<(), Error> {
                     );
                     actuators.transition(vec![speech])?;
                 }
-                Input::HangUp => return Ok(()),
+                Input::HangUp => (),
                 Input::PickUp => {
                     let mut acts: Vec<Box<dyn Act>> = Vec::new();
                     if let Some(phone) = phone.as_ref() {
