@@ -1,0 +1,9 @@
+[target.arm-unknown-linux-gnueabihf]
+# This is the linker which is passed to rustc (via `-C linker=`) when the `$triple`
+# is being compiled for. By default this flag is not passed to the compiler.
+linker = "arm-linux-gnueabihf-gcc"
+ar = "arm-linux-gnueabihf-ar"
+rustflags = [
+    "--verbose",
+    #"-L", "native=/usr/arm-linux-gnueabihf/lib"
+]
