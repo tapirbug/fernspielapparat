@@ -1,8 +1,8 @@
 use crate::sense::{dial::Input, Error, Sense};
-use std::time::Duration;
-use std::thread;
-use crossbeam_channel::{bounded, Sender, Receiver};
+use crossbeam_channel::{bounded, Receiver, Sender};
 use log::debug;
+use std::thread;
+use std::time::Duration;
 
 pub struct BackgroundSense(Receiver<Result<Input, Error>>);
 
@@ -23,7 +23,11 @@ impl BackgroundSense {
     }
 }
 
-fn keep_polling(mut sense: Box<dyn Sense>, poll_interval: Option<Duration>, sender: Sender<Result<Input, Error>>) {
+fn keep_polling(
+    mut sense: Box<dyn Sense>,
+    poll_interval: Option<Duration>,
+    sender: Sender<Result<Input, Error>>,
+) {
     loop {
         match sense.poll() {
             Ok(input) => match sender.send(Ok(input)) {
@@ -35,12 +39,12 @@ fn keep_polling(mut sense: Box<dyn Sense>, poll_interval: Option<Duration>, send
             },
             Err(Error::WouldBlock) => match poll_interval {
                 Some(interval) => thread::sleep(interval),
-                None => thread::yield_now()
+                None => thread::yield_now(),
             },
             fatal => {
                 match sender.send(fatal) {
                     Ok(_) => (),
-                    Err(e) => debug!("Terminating sensor thread, remote end hung up: {:?}", e)
+                    Err(e) => debug!("Terminating sensor thread, remote end hung up: {:?}", e),
                 }
                 break;
             }

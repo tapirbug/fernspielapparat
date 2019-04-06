@@ -10,4 +10,3 @@ pub trait Sense {
     /// When an error is returned, it is assumed non-recoverable.
     fn poll(&mut self) -> Result<Input>;
 }
-

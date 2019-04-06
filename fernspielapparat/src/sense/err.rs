@@ -7,7 +7,7 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn fatal<E : Into<failure::Error>>(cause: E) -> Self {
-        Error::fatal(cause.into())
+    pub fn fatal<E: Into<failure::Error>>(cause: E) -> Self {
+        Error::Fatal(cause.into())
     }
 }

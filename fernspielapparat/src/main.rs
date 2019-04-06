@@ -1,10 +1,10 @@
 extern crate clap;
+extern crate crossbeam_channel;
 extern crate cute_log;
 extern crate failure;
 extern crate i2c_linux;
 extern crate log;
 extern crate tavla;
-extern crate crossbeam_channel;
 
 mod act;
 mod err;
@@ -12,18 +12,17 @@ mod phone;
 mod sense;
 mod state;
 
-use crate::act::{Act, Actuators, Ring};
+use crate::act::Actuators;
 use crate::phone::Phone;
-use crate::sense::{Input, init_sensors};
+use crate::sense::{init_sensors, Input};
 use crate::state::{Machine, State};
 use clap::{crate_authors, crate_name, crate_version, App, Arg};
 use failure::Error;
-use log::{debug, error, warn, info, LevelFilter};
+use log::{debug, error, info, warn, LevelFilter};
+use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
-use std::process::exit;
-use tavla::Voice;
 
 fn main() {
     if bootstrap().is_err() {
@@ -33,24 +32,27 @@ fn main() {
 
 fn bootstrap() -> Result<(), Error> {
     let matches = App::new(crate_name!())
-       .version(crate_version!())
-       .about("Runtime environment for fernspielapparat phonebooks.")
-       .author(crate_authors!())
-       .arg(Arg::with_name("test")
-            .short("t")
-            .long("test")
-            .help("Lets the phone ring and speak for one second as a basic hardware check, then exits."))
-        .arg(Arg::with_name("quiet")
-            .short("q")
-            .long("quiet")
-            .help("Silence warnings and errors"))
-        .arg(Arg::with_name("verbose")
-            .short("v")
-            .long("verbose")
-            .multiple(true)
-            .help("Print non-essential output with diagnostic information to stderr")
-            .conflicts_with("quiet"))
-       .get_matches();
+        .version(crate_version!())
+        .about("Runtime environment for fernspielapparat phonebooks.")
+        .author(crate_authors!())
+        .arg(Arg::with_name("test").short("t").long("test").help(
+            "Lets the phone ring and speak for one second as a basic hardware check, then exits.",
+        ))
+        .arg(
+            Arg::with_name("quiet")
+                .short("q")
+                .long("quiet")
+                .help("Silence warnings and errors"),
+        )
+        .arg(
+            Arg::with_name("verbose")
+                .short("v")
+                .long("verbose")
+                .multiple(true)
+                .help("Print non-essential output with diagnostic information to stderr")
+                .conflicts_with("quiet"),
+        )
+        .get_matches();
 
     let verbosity_level = if matches.is_present("quiet") {
         None
@@ -65,27 +67,26 @@ fn bootstrap() -> Result<(), Error> {
         let result = launch();
         match result {
             Ok(_) => debug!("Exiting after normal operation."),
-            Err(ref err) => log_error(err)
+            Err(ref err) => log_error(err),
         }
         result
     }
 }
 
 fn launch() -> Result<(), Error> {
-    let phone = Phone::new()
-        .ok()
-        .map(|p| Arc::new(Mutex::new(p)));
+    let phone = Phone::new().ok().map(|p| Arc::new(Mutex::new(p)));
 
     if phone.is_some() {
         info!("Phone connected, starting normal operation.");
     } else {
         warn!("No phone available.");
     }
-    
+
     let actuators = Actuators::new(&phone);
     let sensors = init_sensors(&phone);
     let mut machine = Machine::new(
-        sensors, actuators,
+        sensors,
+        actuators,
         vec![
             // 0
             State::builder()
@@ -103,7 +104,9 @@ fn launch() -> Result<(), Error> {
             // 2
             State::builder()
                 .name("speaking")
-                .speech("Finally... Lieutenant Petrow. They have launched the missiles. What do we do?")
+                .speech(
+                    "Finally... Lieutenant Petrow. They have launched the missiles. What do we do?",
+                )
                 .timeout(Duration::from_secs(8), 3)
                 .input(Input::hang_up(), 4)
                 .build(),
@@ -119,8 +122,8 @@ fn launch() -> Result<(), Error> {
                 .name("waiting and then restarting")
                 .timeout(Duration::from_secs(60), 0)
                 .input(Input::pick_up(), 2)
-                .build()
-        ]
+                .build(),
+        ],
     );
 
     while machine.update() {

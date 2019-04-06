@@ -30,29 +30,6 @@ impl Input {
     pub fn hang_up() -> Self {
         Input::HangUp
     }
-
-    /// If this is a number-like input, returns
-    /// its numeric value.
-    pub fn value(&self) -> Option<i32> {
-        match self {
-            Input::Digit(value) => Some(*value as i32),
-            _ => None,
-        }
-    }
-
-    pub fn is_pickup(&self) -> bool {
-        match self {
-            Input::PickUp => true,
-            _ => false
-        }
-    }
-
-    pub fn is_hangup(&self) -> bool {
-        match self {
-            Input::HangUp => true,
-            _ => false
-        }
-    }
 }
 
 mod err {
@@ -68,12 +45,6 @@ mod err {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn value() {
-        let five = Input::digit(5).unwrap();
-        assert_eq!(5, five.value().unwrap());
-    }
 
     #[should_panic]
     #[test]

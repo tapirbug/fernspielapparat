@@ -14,14 +14,14 @@ pub struct State {
     // after duration.
     timeout_transition: Option<(Duration, usize)>,
     ring_time: Option<Duration>,
-    terminal: bool
+    terminal: bool,
 }
 
 impl State {
     pub fn builder() -> StateBuilder {
         StateBuilder::new()
     }
-    
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -37,8 +37,7 @@ impl State {
     /// Returns a transition target ID or `None` for no
     /// transition.
     pub fn transition_for_input(&self, input: Input) -> Option<usize> {
-        self.input_transitions.get(&input)
-            .map(|target| *target)
+        self.input_transitions.get(&input).map(|target| *target)
     }
 
     /// Returns a transition target ID or `None` for no
@@ -54,21 +53,21 @@ impl State {
     }
 
     pub fn is_terminal(&self) -> bool {
-        false
+        self.terminal
     }
 }
 
 mod builder {
-    use super::{State, Input, Duration};
+    use super::{Duration, Input, State};
 
     pub struct StateBuilder {
-        state: State
+        state: State,
     }
 
     impl StateBuilder {
         pub fn new() -> Self {
             StateBuilder {
-                state: Default::default()
+                state: Default::default(),
             }
         }
 

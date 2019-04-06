@@ -5,7 +5,7 @@ use std::io::{stdin, Read};
 /// A dial that reads from stdin.
 pub struct Stdin {
     buf: [u8; 1],
-    last_input: Option<Input>
+    last_input: Option<Input>,
 }
 
 impl Sense for Stdin {
@@ -24,7 +24,7 @@ impl Sense for Stdin {
                         next_input
                     }
                 }
-            },
+            }
             // This catches errors on windows for UTF-8, or when non-blocking IO
             // Also catches Ok(0)
             _ => None,
@@ -41,7 +41,10 @@ impl Sense for Stdin {
 impl Stdin {
     /// Locks on stdin.
     pub fn new() -> Stdin {
-        Stdin { buf: [0], last_input: None }
+        Stdin {
+            buf: [0],
+            last_input: None,
+        }
     }
 }
 
