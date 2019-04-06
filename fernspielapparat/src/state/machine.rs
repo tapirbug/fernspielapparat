@@ -1,30 +1,31 @@
 use crate::sense::{Sensors, Input};
-use crate::act::Actuators;
+use crate::act::{Actuators, Act};
 use crate::state::State;
-use std::collections::HashMap;
+use std::time::Instant;
+use log::debug;
 
 /// A state machine modelled after a mealy machine.
 pub struct Machine {
     sensors: Sensors,
     actuators: Actuators,
     states: Vec<State>,
-    current_state_idx: usize
+    current_state_idx: usize,
+    last_enter_time: Instant
 }
 
 impl Machine {
 
-    pub fn new(sensors: Sensors, mut actuators: Actuators) -> Self {
-        let states = vec![State::default()];
-
+    pub fn new(sensors: Sensors, mut actuators: Actuators, states: Vec<State>) -> Self {
         assert!(states.len() > 0, "Expected at least one state");
-        //states[0].enter(&mut actuators);
 
         let mut machine = Machine {
             sensors,
             actuators,
             states,
-            current_state_idx: 0
+            current_state_idx: 0,
+            last_enter_time: Instant::now()
         };
+        machine.enter();
         machine
     }
 
@@ -53,9 +54,9 @@ impl Machine {
     /// Accepts the next input from actuators and changes state
     /// if a transition is defined.
     fn sense(&mut self) {
-        self.sensors.poll()
-            .and_then(
-                |input| self.transition_for(input)
+        self.current_state().transition_for_timeout(self.last_enter_time)
+            .or_else(|| self.sensors.poll()
+                    .and_then(|i| self.current_state().transition_for_input(i))
             )
             .map(|next_idx| {
                 self.transition_to(next_idx);
@@ -73,27 +74,30 @@ impl Machine {
         self.current_state().is_terminal()
     }
 
-    fn transition_for(&self, input: Input) -> Option<usize> {
-        self.current_state().transition_for(input)
-    }
-
     fn transition_to(&mut self, idx: usize) {
         let actuators = &mut self.actuators;
-        // self.states[self.current_state_idx].exit(actuators);
+        self.exit();
         self.current_state_idx = idx;
-        // self.states[self.current_state_idx].enter(actuators);
+        self.enter();
     }
 
-    /*
-    fn enter(&self, actuators: &mut Actuators) {
-        // TODO do something
+    /// Enters the current state.
+    fn enter(&mut self) {
+        let state = &self.states[self.current_state_idx];
+        let actuators = &mut self.actuators;
+        actuators.transition_to(state)
+            .expect("Entering state failed");
+
+        debug!("Transition to: {}", state.name());
+
+        self.last_enter_time = Instant::now();
     }
 
-    fn exit(&self, actuators: &mut Actuators) {
-        actuators.transition(Vec::new())
+    /// Exits the current state.
+    fn exit(&mut self) {
+        self.actuators.transition(Vec::new())
             .expect("Exiting state failed");
     }
-    */
 }
 
 #[cfg(test)]

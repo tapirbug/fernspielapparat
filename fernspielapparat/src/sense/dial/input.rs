@@ -3,7 +3,7 @@ pub use err::Error;
 /// Anything you can input with a phone dial,
 /// including special characters like _#_,
 /// picking up the speaker and hanging up.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Input {
     /// A single digit number input in range [0,9].
     Digit(u8),

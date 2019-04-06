@@ -15,6 +15,7 @@ mod state;
 use crate::act::{Act, Actuators, Ring};
 use crate::phone::Phone;
 use crate::sense::{Input, init_sensors};
+use crate::state::{Machine, State};
 use clap::{crate_authors, crate_name, crate_version, App, Arg};
 use failure::Error;
 use log::{debug, error, warn, info, LevelFilter};
@@ -81,44 +82,52 @@ fn launch() -> Result<(), Error> {
         warn!("No phone available.");
     }
     
-    let mut actuators = Actuators::new();
-    let mut sensors = init_sensors(&phone);
-    let voice = tavla::any_voice()?;
+    let actuators = Actuators::new(&phone);
+    let sensors = init_sensors(&phone);
+    let mut machine = Machine::new(
+        sensors, actuators,
+        vec![
+            // 0
+            State::builder()
+                .name("ring_on")
+                .ring_for(Duration::from_millis(500))
+                .timeout(Duration::from_millis(500), 1)
+                .input(Input::pick_up(), 2)
+                .build(),
+            // 1
+            State::builder()
+                .name("ring_off")
+                .timeout(Duration::from_millis(1500), 0)
+                .input(Input::pick_up(), 2)
+                .build(),
+            // 2
+            State::builder()
+                .name("speaking")
+                .speech("Finally... Lieutenant Petrow. They have launched the missiles. What do we do?")
+                .timeout(Duration::from_secs(8), 3)
+                .input(Input::hang_up(), 4)
+                .build(),
+            // 3
+            State::builder()
+                .name("panicking")
+                .speech("Are you still there, Lieutenant Petrow?")
+                .timeout(Duration::from_secs(10), 3)
+                .input(Input::hang_up(), 4)
+                .build(),
+            // 4
+            State::builder()
+                .name("waiting and then restarting")
+                .timeout(Duration::from_secs(60), 0)
+                .input(Input::pick_up(), 2)
+                .build()
+        ]
+    );
 
-    loop {
-        while let Some(input) = sensors.poll() {
-            debug!("{:?}", input);
-
-            match input {
-                Input::Digit(_) => {
-                    let speech = Box::new(
-                        voice
-                            .speak(format!("You typed _{}_", input.value().unwrap_or(100)))
-                            .unwrap(),
-                    );
-                    actuators.transition(vec![speech])?;
-                }
-                Input::HangUp => {
-                    if let Some(ref phone) = phone {
-                        let ring = Box::new(
-                            Ring::new(phone, Duration::from_millis(600))?
-                        );
-                        actuators.transition(vec![ring])?;
-                    } else {
-                        println!("rrrring");
-                    }
-                },
-                Input::PickUp => {
-                    let speech = Box::new(voice.speak("Finally. Lieutenant Petrow, they have launched the missiles. What do we do?")?);
-                    actuators.transition(vec![speech])?;
-                }
-            }
-        }
-
-        actuators.update()?;
-
+    while machine.update() {
         sleep(Duration::from_millis(10));
     }
+
+    Ok(())
 }
 
 fn log_error(error: &Error) {

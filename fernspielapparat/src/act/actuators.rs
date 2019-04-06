@@ -1,18 +1,27 @@
-use crate::act::Act;
+use crate::act::{Act, Ring};
 use crate::err::compound_result;
+use crate::state::State;
+use crate::phone::Phone;
 use failure::Error;
 use log::{warn, error};
 use std::fmt::Debug;
 use std::mem::replace;
+use tavla::{Voice, any_voice};
+use std::sync::{Mutex, Arc};
 
 pub struct Actuators {
     active: Vec<Box<dyn Act>>,
+    phone: Option<Arc<Mutex<Phone>>>
 }
 
 #[allow(dead_code)]
 impl Actuators {
-    pub fn new() -> Self {
-        Actuators { active: Vec::new() }
+    pub fn new(phone: &Option<Arc<Mutex<Phone>>>) -> Self {
+        Actuators {
+            active: Vec::new(),
+            phone: phone.as_ref()
+                .map(Arc::clone)
+        }
     }
 
     pub fn update(&mut self) -> Result<(), Error> {
@@ -35,6 +44,38 @@ impl Actuators {
         });
 
         Ok(())
+    }
+
+    pub fn transition_to(&mut self, state: &State) -> Result<(), Error> {
+        self.transition(self.make_act_states(state))
+    }
+
+    fn make_act_states(&self, state: &State) -> Vec<Box<dyn Act>> {
+        let mut acts : Vec<Box<dyn Act>> = vec![];
+
+        if !state.speech().is_empty() {
+            acts.push(
+                Box::new(
+                    any_voice()
+                        .expect("Could not load a voice")
+                        .speak(state.speech())
+                        .expect("Could not start speech for state")
+                )
+            );
+        }
+
+        if let Some(phone) = self.phone.as_ref() {
+            if let Some(duration) = state.ring_time() {
+                acts.push(
+                    Box::new(
+                        Ring::new(phone, duration)
+                            .expect("Failed to start ring")
+                    )
+                )
+            }
+        }
+
+        acts
     }
 
     pub fn transition(&mut self, next_acts: Vec<Box<dyn Act>>) -> Result<(), Error> {
