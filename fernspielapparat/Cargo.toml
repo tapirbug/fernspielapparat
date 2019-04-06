@@ -5,10 +5,13 @@ authors = ["krachzack <hello@phstadler.com>"]
 edition = "2018"
 
 [dependencies]
-failure = "0.1.5"
-crossbeam-channel = "0.3.8"
+failure = "0.1"
+crossbeam-channel = "0.3"
 tavla = { git = "https://github.com/krachzack/tavla.git" }
-i2c-linux = "0.1.2"
-clap = "2.32.0"
+i2c-linux = "0.1"
+clap = "2.32"
 log = "0.4"
-cute-log = "1.1.2"
+cute-log = "1.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
+

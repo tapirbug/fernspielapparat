@@ -5,8 +5,11 @@ extern crate failure;
 extern crate i2c_linux;
 extern crate log;
 extern crate tavla;
+extern crate serde;
+extern crate serde_yaml;
 
 mod act;
+mod book;
 mod err;
 mod phone;
 mod sense;
