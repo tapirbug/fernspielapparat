@@ -3,7 +3,7 @@ pub use err::Error;
 /// Anything you can input with a phone dial,
 /// including special characters like _#_,
 /// picking up the speaker and hanging up.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Input {
     /// A single digit number input in range [0,9].
     Digit(u8),
@@ -37,6 +37,20 @@ impl Input {
         match self {
             Input::Digit(value) => Some(*value as i32),
             _ => None,
+        }
+    }
+
+    pub fn is_pickup(&self) -> bool {
+        match self {
+            Input::PickUp => true,
+            _ => false
+        }
+    }
+
+    pub fn is_hangup(&self) -> bool {
+        match self {
+            Input::HangUp => true,
+            _ => false
         }
     }
 }

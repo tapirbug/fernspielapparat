@@ -1,6 +1,8 @@
 use crate::sense::{dial::Input, Error, Sense};
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::time::Duration;
 use std::thread;
+use crossbeam_channel::{bounded, Sender, Receiver};
+use log::debug;
 
 pub struct BackgroundSense(Receiver<Result<Input, Error>>);
 
@@ -11,23 +13,35 @@ impl Sense for BackgroundSense {
 }
 
 impl BackgroundSense {
-    pub fn spawn(sense: Box<dyn Sense + Send>) -> Box<dyn Sense> {
-        // 1: if last input has not been handled yet, let worker block until receiver polled
-        let (tx, rx) = sync_channel(1);
+    pub fn spawn(sense: Box<dyn Sense + Send>, poll_interval: Option<Duration>) -> Box<dyn Sense> {
+        // 0: Block when four unconsumed inputs in the queue
+        let (tx, rx) = bounded(4);
         thread::spawn(move || {
-            keep_polling(sense, tx);
+            keep_polling(sense, poll_interval, tx);
         });
         Box::new(BackgroundSense(rx))
     }
 }
 
-fn keep_polling(mut sense: Box<dyn Sense>, sender: SyncSender<Result<Input, Error>>) {
+fn keep_polling(mut sense: Box<dyn Sense>, poll_interval: Option<Duration>, sender: Sender<Result<Input, Error>>) {
     loop {
         match sense.poll() {
-            Ok(input) => sender.send(Ok(input)).expect("Could not send input back"),
-            Err(Error::WouldBlock) => thread::yield_now(),
+            Ok(input) => match sender.send(Ok(input)) {
+                Ok(_) => (),
+                Err(e) => {
+                    debug!("Terminating sensor thread, remote end hung up: {:?}", e);
+                    break;
+                }
+            },
+            Err(Error::WouldBlock) => match poll_interval {
+                Some(interval) => thread::sleep(interval),
+                None => thread::yield_now()
+            },
             fatal => {
-                sender.send(fatal).unwrap();
+                match sender.send(fatal) {
+                    Ok(_) => (),
+                    Err(e) => debug!("Terminating sensor thread, remote end hung up: {:?}", e)
+                }
                 break;
             }
         }

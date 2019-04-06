@@ -1,45 +1,24 @@
 use crate::sense::{Sensors, Input};
 use crate::act::Actuators;
+use crate::state::State;
 use std::collections::HashMap;
 
-struct Machine {
+/// A state machine modelled after a mealy machine.
+pub struct Machine {
     sensors: Sensors,
     actuators: Actuators,
     states: Vec<State>,
     current_state_idx: usize
 }
 
-struct State;
-
-impl State {
-    /// Returns a transition target ID or `None` for no
-    /// transition.
-    fn transition_for(&self, input: Input) -> Option<usize> {
-        unimplemented!()
-    }
-
-    fn is_terminal(&self) -> bool {
-        false
-    }
-
-    fn enter(&self, actuators: &mut Actuators) {
-        // TODO do something
-    }
-
-    fn exit(&self, actuators: &mut Actuators) {
-        actuators.transition(Vec::new())
-            .expect("Exiting state failed");
-    }
-}
-
 impl Machine {
 
     pub fn new(sensors: Sensors, mut actuators: Actuators) -> Self {
-        let states = vec![State];
+        let states = vec![State::default()];
 
         assert!(states.len() > 0, "Expected at least one state");
-        states[0].enter(&mut actuators);
-        
+        //states[0].enter(&mut actuators);
+
         let mut machine = Machine {
             sensors,
             actuators,
@@ -100,10 +79,21 @@ impl Machine {
 
     fn transition_to(&mut self, idx: usize) {
         let actuators = &mut self.actuators;
-        self.states[self.current_state_idx].exit(actuators);
+        // self.states[self.current_state_idx].exit(actuators);
         self.current_state_idx = idx;
-        self.states[self.current_state_idx].enter(actuators);
+        // self.states[self.current_state_idx].enter(actuators);
     }
+
+    /*
+    fn enter(&self, actuators: &mut Actuators) {
+        // TODO do something
+    }
+
+    fn exit(&self, actuators: &mut Actuators) {
+        actuators.transition(Vec::new())
+            .expect("Exiting state failed");
+    }
+    */
 }
 
 #[cfg(test)]

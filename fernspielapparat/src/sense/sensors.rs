@@ -42,6 +42,7 @@ impl Sensors {
 mod builder {
     use super::{Sense, Sensors};
     use crate::sense::bg::BackgroundSense;
+    use std::time::Duration;
 
     pub struct Builder {
         may_block: Vec<Box<dyn Sense + Send>>,
@@ -68,7 +69,7 @@ mod builder {
             Sensors(
                 self.may_block
                     .into_iter()
-                    .map(BackgroundSense::spawn)
+                    .map(|sensor| BackgroundSense::spawn(sensor, Some(Duration::from_millis(50)))) // No more than 20 inputs/second
                     .collect(),
             )
         }

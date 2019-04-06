@@ -1,5 +1,4 @@
-use crate::sense::dial::Input;
-use failure;
+use crate::sense::{dial::Input, Error};
 use std::result;
 
 type Result<T> = result::Result<T, Error>;
@@ -12,8 +11,3 @@ pub trait Sense {
     fn poll(&mut self) -> Result<Input>;
 }
 
-pub enum Error {
-    WouldBlock,
-    #[allow(dead_code)]
-    Fatal(failure::Error),
-}

@@ -1,7 +1,7 @@
 use crate::act::Act;
 use crate::err::compound_result;
 use failure::Error;
-use log::error;
+use log::{warn, error};
 use std::fmt::Debug;
 use std::mem::replace;
 
@@ -38,7 +38,10 @@ impl Actuators {
     }
 
     pub fn transition(&mut self, next_acts: Vec<Box<dyn Act>>) -> Result<(), Error> {
-        cancel_all(&mut replace(&mut self.active, next_acts))?;
+        match cancel_all(&mut replace(&mut self.active, next_acts)) {
+            Err(errs) => warn!("Some acts could not be cancelled: {}", errs),
+            _ => ()
+        };
         Ok(())
     }
 

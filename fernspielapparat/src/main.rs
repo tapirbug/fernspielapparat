@@ -4,6 +4,7 @@ extern crate failure;
 extern crate i2c_linux;
 extern crate log;
 extern crate tavla;
+extern crate crossbeam_channel;
 
 mod act;
 mod err;
@@ -24,12 +25,12 @@ use std::process::exit;
 use tavla::Voice;
 
 fn main() {
-    if run().is_err() {
+    if bootstrap().is_err() {
         exit(1);
     }
 }
 
-fn run() -> Result<(), Error> {
+fn bootstrap() -> Result<(), Error> {
     let matches = App::new(crate_name!())
        .version(crate_version!())
        .about("Runtime environment for fernspielapparat phonebooks.")
@@ -61,18 +62,16 @@ fn run() -> Result<(), Error> {
         check_phone();
     }
 
-    let result = launch_runtime();
+    let result = launch();
     match result {
         Ok(_) => debug!("Exiting after normal operation."),
-        Err(ref err) => {
-            error!("Exiting due to fatal error: {}", err);
-        }
+        Err(ref err) => log_error(err)
     }
 
     result
 }
 
-fn launch_runtime() -> Result<(), Error> {
+fn launch() -> Result<(), Error> {
     let phone = Phone::new()
         .ok()
         .map(|p| Arc::new(Mutex::new(p)));
@@ -90,6 +89,7 @@ fn launch_runtime() -> Result<(), Error> {
     loop {
         while let Some(input) = sensors.poll() {
             debug!("{:?}", input);
+
             match input {
                 Input::Digit(_) => {
                     let speech = Box::new(
@@ -99,16 +99,19 @@ fn launch_runtime() -> Result<(), Error> {
                     );
                     actuators.transition(vec![speech])?;
                 }
-                Input::HangUp => (),
-                Input::PickUp => {
-                    let mut acts: Vec<Box<dyn Act>> = Vec::new();
-                    if let Some(phone) = phone.as_ref() {
-                        acts.push(Box::new(
-                            Ring::new(&phone, Duration::from_millis(100))?
-                        ));
+                Input::HangUp => {
+                    if let Some(ref phone) = phone {
+                        let ring = Box::new(
+                            Ring::new(phone, Duration::from_millis(100))?
+                        );
+                        actuators.transition(vec![ring])?;
+                    } else {
+                        println!("rrrring");
                     }
-                    acts.push(Box::new(voice.speak("You picked up").unwrap()));
-                    actuators.transition(acts)?;
+                },
+                Input::PickUp => {
+                    let speech = Box::new(voice.speak("You picked up")?);
+                    actuators.transition(vec![speech])?;
                 }
             }
         }
@@ -116,6 +119,16 @@ fn launch_runtime() -> Result<(), Error> {
         actuators.update()?;
 
         sleep(Duration::from_millis(10));
+    }
+}
+
+fn log_error(error: &Error) {
+    error!("Exiting due to fatal error.");
+    debug!("Backtrace: {}", error.backtrace());
+
+    for cause in error.iter_chain() {
+        error!("Cause: {}", cause);
+        debug!("Cause: {:?}", cause);
     }
 }
 

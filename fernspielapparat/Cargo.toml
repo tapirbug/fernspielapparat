@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 failure = "0.1.5"
+crossbeam-channel = "0.3.8"
 tavla = { git = "https://github.com/krachzack/tavla.git" }
 i2c-linux = "0.1.2"
 clap = "2.32.0"

@@ -1,12 +1,6 @@
 # Cross compiling for Raspberry Pi 2
 
-## Arch Linux
-From the AUR. E.g. with aurman (you can of course do this manually):
+## Any Linux
+This pre-built toolchain worked well for me: https://github.com/rvagg/rpi-newer-crosstools/blob/master/x64-gcc-6.3.1.config
 
-    aurman -Syu arm-linux-gnueabihf-binutils \
-        arm-linux-gnueabihf-gcc-stage1 && \
-    aurman -Syu arm-linux-gnueabihf-linux-api-headers \
-        arm-linux-gnueabihf-glibc-headers && \
-    aurman -Syu arm-linux-gnueabihf-gcc-stage2 && \
-    aurman -Syu arm-linux-gnueabihf-glibc \
-        arm-linux-gnueabihf-gcc
+You can also try crosstool-ng yourself.
