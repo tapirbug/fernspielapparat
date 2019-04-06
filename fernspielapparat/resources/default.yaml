@@ -1,0 +1,33 @@
+states:
+  ring:
+    ring: 0.5
+  speaking:
+    speech: >
+      Lieutenant Petrow!
+      They have launched the missiles.
+      What are your orders?
+  panicking:
+    speech: Are you still there, Lieutenant Petrow?
+  hung_up:
+
+transitions:
+  ring:
+    timeout:
+      after: 1.0
+      to: ring
+  speaking:
+    timeout:
+      after: 10.0
+      to: panicking
+  panicking:
+    timeout:
+      after: 15.0
+      to: panicking
+  hung_up:
+    timeout:
+      after: 60.0
+      to: ring
+  any:
+    pick_up: speaking
+    hang_up: hung_up
+    

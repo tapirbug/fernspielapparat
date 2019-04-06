@@ -38,8 +38,18 @@ fn bootstrap() -> Result<(), Error> {
         .version(crate_version!())
         .about("Runtime environment for fernspielapparat phonebooks.")
         .author(crate_authors!())
+        .arg(Arg::with_name("phonebook")
+            .help("Path to the phone book to use")
+            .required(true)
+            .conflicts_with("default"))
+        .arg(Arg::with_name("default")
+            .short("d")
+            .long("default")
+            .help("Loads the default phonebook at startup")
+            .conflicts_with("phonebook"))
         .arg(Arg::with_name("test").short("t").long("test").help(
-            "Lets the phone ring and speak for one second as a basic hardware check, then exits.",
+            "Lets the phone ring and speak for one second as a basic hardware \
+            check, then exits.",
         ))
         .arg(
             Arg::with_name("quiet")
@@ -67,7 +77,13 @@ fn bootstrap() -> Result<(), Error> {
     if matches.is_present("test") {
         check_phone()
     } else {
-        let result = launch();
+        let states = if matches.is_present("default") {
+            book::from_str(include_str!("../resources/default.yaml"))?
+        } else {
+            book::from_path(matches.value_of("phonebook").unwrap())?
+        };
+
+        let result = launch(states);
         match result {
             Ok(_) => debug!("Exiting after normal operation."),
             Err(ref err) => log_error(err),
@@ -76,7 +92,7 @@ fn bootstrap() -> Result<(), Error> {
     }
 }
 
-fn launch() -> Result<(), Error> {
+fn launch(states: Vec<State>) -> Result<(), Error> {
     let phone = Phone::new().ok().map(|p| Arc::new(Mutex::new(p)));
 
     if phone.is_some() {
@@ -90,43 +106,7 @@ fn launch() -> Result<(), Error> {
     let mut machine = Machine::new(
         sensors,
         actuators,
-        vec![
-            // 0
-            State::builder()
-                .name("ring_on")
-                .ring_for(Duration::from_millis(500))
-                .timeout(Duration::from_millis(500), 1)
-                .input(Input::pick_up(), 2)
-                .build(),
-            // 1
-            State::builder()
-                .name("ring_off")
-                .timeout(Duration::from_millis(1500), 0)
-                .input(Input::pick_up(), 2)
-                .build(),
-            // 2
-            State::builder()
-                .name("speaking")
-                .speech(
-                    "Finally... Lieutenant Petrow. They have launched the missiles. What do we do?",
-                )
-                .timeout(Duration::from_secs(8), 3)
-                .input(Input::hang_up(), 4)
-                .build(),
-            // 3
-            State::builder()
-                .name("panicking")
-                .speech("Are you still there, Lieutenant Petrow?")
-                .timeout(Duration::from_secs(10), 3)
-                .input(Input::hang_up(), 4)
-                .build(),
-            // 4
-            State::builder()
-                .name("waiting and then restarting")
-                .timeout(Duration::from_secs(60), 0)
-                .input(Input::pick_up(), 2)
-                .build(),
-        ],
+        states,
     );
 
     while machine.update() {

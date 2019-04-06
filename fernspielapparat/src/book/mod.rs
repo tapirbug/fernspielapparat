@@ -1,67 +1,30 @@
+pub mod book;
+mod compile;
+use failure::Error;
 use std::path::PathBuf;
-use std::collections::HashMap;
-use serde::Deserialize;
+use crate::state::State;
+use serde_yaml;
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug, Deserialize)]
-struct StateId(String);
-
-#[derive(Deserialize)]
-struct Book {
-    states: HashMap<StateId, State>,
-    #[serde(default)]
-    transitions: HashMap<StateId, Transition>
+pub fn from_path<P : Into<PathBuf>>(source_file: P) -> Result<Vec<State>, Error> {
+    file::load(source_file)
+        .and_then(compile::compile)
 }
 
-#[derive(Deserialize)]
-struct State {
-    #[serde(default)]
-    speech: String,
-    speech_file: Option<PathBuf>,
-    #[serde(default)]
-    lights: Lighting
+pub fn from_str<S : AsRef<str>>(source_string: S) -> Result<Vec<State>, Error> {
+    let book = serde_yaml::from_str(source_string.as_ref())?;
+    compile::compile(book)
 }
 
-#[derive(Deserialize, Default)]
-struct Lighting {
-    #[serde(default)]
-    power: i8,
-    #[serde(default)]
-    excitement: i8,
-    #[serde(default)]
-    mood: i8
-}
+mod file {
+    use super::book::Book;
+    use failure::Error;
+    use std::path::PathBuf;
+    use std::fs::File;
+    use serde_yaml::from_reader;
 
-#[derive(Deserialize)]
-enum Transition {
-    /// When input in some format was received.
-    #[serde(rename = "dial")]
-    Dial(HashMap<String, StateId>),
-    /// When all actuators are done.
-    #[serde(rename = "end")]
-    Done(StateId)
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use serde_yaml::from_str;
-
-    #[test]
-    fn deserialize_example_book() {
-        let _book : Book = from_str(include_str!("../../test/testbook_full.yaml"))
-            .expect("Expected the example book to work");
-    }
-
-    #[test]
-    fn deserialize_without_initial_and_transitions() {
-        let _book : Book = from_str(include_str!("../../test/testbook_only_states.yaml"))
-            .expect("Could not deserialize");
-    }
-
-    #[should_panic]
-    #[test]
-    fn deserialize_empty_should_fail() {
-        let _book : Book = from_str("")
-            .expect("Could not deserialize");
+    pub fn load<P : Into<PathBuf>>(source_file: P) -> Result<Book, Error> {
+        let mut source_file = File::open(source_file.into())?;
+        let book = from_reader(&mut source_file)?;
+        Ok(book)
     }
 }
