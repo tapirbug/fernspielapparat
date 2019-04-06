@@ -83,6 +83,8 @@ fn bootstrap() -> Result<(), Error> {
             book::from_path(matches.value_of("phonebook").unwrap())?
         };
 
+        debug!("{:?}", &states);
+
         let result = launch(states);
         match result {
             Ok(_) => debug!("Exiting after normal operation."),

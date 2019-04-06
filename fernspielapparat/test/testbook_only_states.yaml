@@ -111,3 +111,7 @@ states:
       # ringing time yourself like this:
       <ring 5.1> 
       
+# From the states we just defined, we pick one that
+# is the start of the story. If you do not define
+# a start state, the first one is picked automatically.
+initial: announcement

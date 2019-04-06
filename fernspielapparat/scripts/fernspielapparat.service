@@ -10,6 +10,6 @@ WantedBy=multi-user.target
 User=pi
 Type=simple
 PrivateTmp=true
-ExecStart=/home/pi/fernspielapparat
+ExecStart=/home/pi/fernspielapparat --default
 Restart=always
 RestartSec=10

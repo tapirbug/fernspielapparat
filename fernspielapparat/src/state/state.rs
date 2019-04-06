@@ -3,7 +3,7 @@ use builder::StateBuilder;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct State {
     // Name of this state, not guaranteed to be unique.
     name: String,

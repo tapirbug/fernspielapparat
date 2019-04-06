@@ -28,3 +28,24 @@ mod file {
         Ok(book)
     }
 }
+
+#[cfg(test)]
+mod test {    
+    use super::*;
+
+    #[test]
+    fn can_compile_default() {
+        let states = from_str(include_str!("../../resources/default.yaml"))
+                .unwrap();
+
+        assert_eq!(states[0].name(), "ring");
+    }
+
+    #[test]
+    fn can_compile_example() {
+        let states = from_path("test/testbook_full.yaml")
+                .unwrap();
+
+        assert_eq!(states[0].name(), "announcement");
+    }
+}

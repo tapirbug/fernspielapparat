@@ -10,6 +10,8 @@ states:
     speech: Are you still there, Lieutenant Petrow?
   hung_up:
 
+initial: ring
+
 transitions:
   ring:
     timeout:

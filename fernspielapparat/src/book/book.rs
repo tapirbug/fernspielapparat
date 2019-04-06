@@ -1,20 +1,34 @@
 use std::path::PathBuf;
 use std::collections::HashMap;
-use std::time::Duration;
 use serde::Deserialize;
+use std::fmt;
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Deserialize)]
 #[serde(transparent)]
 pub struct StateId(String);
 
+impl StateId {
+    pub fn new<S: Into<String>>(from: S) -> Self {
+        StateId(from.into())
+    }
+}
+
+impl fmt::Display for StateId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Deserialize)]
 pub struct Book {
+    pub initial: StateId,
+    pub terminal: Option<StateId>,
     pub states: HashMap<StateId, Option<State>>,
     #[serde(default)]
     pub transitions: HashMap<StateId, Transitions>
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct State {
     #[serde(default)]
     pub speech: String,
@@ -36,23 +50,23 @@ pub struct Lighting {
     pub mood: i8
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct Transitions {
     /// When input in some format was received.
     #[serde(default)]
-    dial: HashMap<u8, StateId>,
-    pick_up: Option<StateId>,
-    hang_up: Option<StateId>,
+    pub dial: HashMap<u8, StateId>,
+    pub pick_up: Option<StateId>,
+    pub hang_up: Option<StateId>,
     /// When all actuators are done.
-    end: Option<StateId>,
-    timeout: Option<Timeout>
+    pub end: Option<StateId>,
+    pub timeout: Option<Timeout>
 }
 
-#[derive(Deserialize)]
-struct Timeout {
+#[derive(Deserialize, Clone)]
+pub struct Timeout {
     /// Time in seconds.
-    after: f64,
-    to: StateId
+    pub after: f64,
+    pub to: StateId
 }
 
 #[cfg(test)]
