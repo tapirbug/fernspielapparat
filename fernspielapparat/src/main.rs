@@ -38,7 +38,7 @@ fn bootstrap() -> Result<(), Error> {
        .arg(Arg::with_name("test")
             .short("t")
             .long("test")
-            .help("Before starting main operation, lets the phone ring and speak for one second as a basic hardware check"))
+            .help("Lets the phone ring and speak for one second as a basic hardware check, then exits."))
         .arg(Arg::with_name("quiet")
             .short("q")
             .long("quiet")
@@ -59,16 +59,15 @@ fn bootstrap() -> Result<(), Error> {
     init_logging(verbosity_level);
 
     if matches.is_present("test") {
-        check_phone();
+        check_phone()
+    } else {
+        let result = launch();
+        match result {
+            Ok(_) => debug!("Exiting after normal operation."),
+            Err(ref err) => log_error(err)
+        }
+        result
     }
-
-    let result = launch();
-    match result {
-        Ok(_) => debug!("Exiting after normal operation."),
-        Err(ref err) => log_error(err)
-    }
-
-    result
 }
 
 fn launch() -> Result<(), Error> {
@@ -102,7 +101,7 @@ fn launch() -> Result<(), Error> {
                 Input::HangUp => {
                     if let Some(ref phone) = phone {
                         let ring = Box::new(
-                            Ring::new(phone, Duration::from_millis(100))?
+                            Ring::new(phone, Duration::from_millis(600))?
                         );
                         actuators.transition(vec![ring])?;
                     } else {
@@ -110,7 +109,7 @@ fn launch() -> Result<(), Error> {
                     }
                 },
                 Input::PickUp => {
-                    let speech = Box::new(voice.speak("You picked up")?);
+                    let speech = Box::new(voice.speak("Finally. Lieutenant Petrow, they have launched the missiles. What do we do?")?);
                     actuators.transition(vec![speech])?;
                 }
             }
@@ -132,21 +131,24 @@ fn log_error(error: &Error) {
     }
 }
 
-fn check_phone() {
+fn check_phone() -> Result<(), Error> {
     info!("Testing communication with hardware phone...");
 
     let test_result = Phone::new().and_then(|mut phone| {
         phone.ring()?;
         sleep(Duration::from_secs(1));
-        phone.unring()
+        phone.unring()?;
+        Ok(())
     });
 
     match test_result {
         Ok(_) => info!("Hardware phone ok."),
-        Err(e) => {
+        Err(ref e) => {
             error!("Communication with hardware phone failed: {}.", e);
         }
     }
+
+    Ok(test_result?)
 }
 
 fn init_logging(verbosity_level: Option<u64>) {

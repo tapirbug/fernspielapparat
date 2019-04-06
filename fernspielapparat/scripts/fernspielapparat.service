@@ -1,0 +1,15 @@
+[Unit]
+Description=fernspielapparat
+Requires=pulseaudio.service
+After=pulseaudio.service
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+User=pi
+Type=simple
+PrivateTmp=true
+ExecStart=/home/pi/fernspielapparat
+Restart=always
+RestartSec=10

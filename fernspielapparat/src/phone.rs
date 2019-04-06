@@ -37,7 +37,6 @@ impl Phone {
         // Reads should not block for longer than ten millis so
         // writers get a chance to write, e.g. for ringing.
         i2c.i2c_set_timeout(Duration::from_millis(50))?;
-        //i2c.i2c_set_retries(100)?;
 
         Ok(Phone { i2c, retries_121: 25 })
     }
@@ -72,7 +71,11 @@ impl Phone {
     fn send(&mut self, msg: Msg) -> Result<()> {
         try_121_safe(
             self.retries_121,
-            || self.i2c.smbus_write_byte(msg.into_u8())
+            || {
+                self.i2c.smbus_write_byte_data(msg.into_u8(), msg.into_u8())?;
+                self.i2c.smbus_read_byte()?;
+                Ok(())
+            }
         )
     }
 
