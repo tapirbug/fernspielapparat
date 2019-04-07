@@ -54,12 +54,23 @@ impl Machine {
     /// if a transition is defined.
     fn sense(&mut self) {
         self.current_state()
+            // Highest priority: timeout
             .transition_for_timeout(self.last_enter_time)
+            // Then try transitions on speech end
+            .or_else(|| {
+                if self.actuators.done() {
+                    self.current_state().transition_end()
+                } else {
+                    None
+                }
+            })
+            // Then try input transitions
             .or_else(|| {
                 self.sensors
                     .poll()
                     .and_then(|i| self.current_state().transition_for_input(i))
             })
+            // If anything triggered a transition, perform it.
             .map(|next_idx| {
                 self.transition_to(next_idx);
             });

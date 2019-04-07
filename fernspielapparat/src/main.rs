@@ -42,7 +42,7 @@ fn bootstrap() -> Result<(), Error> {
             Arg::with_name("phonebook")
                 .help("Path to the phone book to use")
                 .required(true)
-                .conflicts_with("default"),
+                .conflicts_with("demo"),
         )
         .arg(
             Arg::with_name("demo")

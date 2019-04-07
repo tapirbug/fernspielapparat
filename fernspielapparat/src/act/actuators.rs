@@ -45,6 +45,14 @@ impl Actuators {
         Ok(())
     }
 
+    /// Returns `true` all acts are done or have been cancelled.
+    /// 
+    /// Returns `false` if some actuators are still working, e.g.
+    /// speech is still ongoing.
+    pub fn done(&self) -> bool {
+        self.active.is_empty()
+    }
+
     pub fn transition_to(&mut self, state: &State) -> Result<(), Error> {
         self.transition(self.make_act_states(state))
     }

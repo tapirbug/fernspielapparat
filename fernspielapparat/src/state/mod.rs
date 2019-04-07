@@ -4,4 +4,4 @@ mod machine;
 mod state;
 
 pub use machine::Machine;
-pub use state::State;
+pub use state::{State, StateBuilder};

@@ -1,6 +1,6 @@
 use crate::book::book;
 use crate::sense::Input;
-use crate::state::State;
+use crate::state::{State, StateBuilder};
 use book::{Book, StateId, Transitions};
 use failure::{bail, format_err, Error};
 use std::time::Duration;
@@ -71,29 +71,16 @@ fn compile_state(
         .terminal(terminal);
     // TODO speech_file
 
-    if spec.ring != 0.0 {
-        let ms = (spec.ring * 1000.0) as u64;
-        state = state.ring_for(Duration::from_millis(ms));
-    }
+    state = compile_ring(state, spec.ring);
+
 
     if let Some(ref timeout) = transitions.timeout {
-        let ms = (timeout.after * 1000.0) as u64;
-
-        let target_idx = defined_states
-            .iter()
-            .position(|id| *id == timeout.to)
-            .ok_or_else(|| format_err!("Transition mentions unknown state: {:?}", timeout.to))?;
-
-        state = state.timeout(Duration::from_millis(ms), target_idx)
+        state = lookup_state(defined_states, &timeout.to)
+            .map(|idx| compile_timeout(state, timeout.after, idx))?
     }
 
-    // TODO done/end
-
     for (input, target_id) in transitions.dial.iter() {
-        let target_idx = defined_states
-            .iter()
-            .position(|id| *id == *target_id)
-            .ok_or_else(|| format_err!("Transition mentions unknown state: {:?}", target_id))?;
+        let target_idx = lookup_state(defined_states, target_id)?;
 
         if *input > 9 {
             bail!(
@@ -106,24 +93,42 @@ fn compile_state(
     }
 
     if let Some(ref target_id) = transitions.hang_up {
-        let target_idx = defined_states
-            .iter()
-            .position(|id| *id == *target_id)
-            .ok_or_else(|| format_err!("Transition mentions unknown state: {:?}", target_id))?;
-
+        let target_idx = lookup_state(defined_states, target_id)?;
         state = state.input(Input::hang_up(), target_idx);
     }
 
     if let Some(ref target_id) = transitions.pick_up {
-        let target_idx = defined_states
-            .iter()
-            .position(|id| *id == *target_id)
-            .ok_or_else(|| format_err!("Transition mentions unknown state: {:?}", target_id))?;
-
+        let target_idx = lookup_state(defined_states, target_id)?;
         state = state.input(Input::pick_up(), target_idx);
     }
 
+    if let Some(ref target_id) = transitions.end {
+        let target_idx = lookup_state(defined_states, target_id)?;
+        state = state.end(target_idx);
+    }
+
     Ok(state.build())
+}
+
+fn lookup_state(defined_states: &[StateId], search_id: &StateId) -> Result<usize, Error> {
+    defined_states
+            .iter()
+            .position(|id| id == search_id)
+            .ok_or_else(|| format_err!("Transition mentions unknown state: {}", search_id))
+}
+
+fn compile_ring(state: StateBuilder, ring: f64) -> StateBuilder {
+    if ring == 0.0 {
+        state
+    } else {
+        let ms = (ring * 1000.0) as u64;
+        state.ring_for(Duration::from_millis(ms))
+    }
+}
+
+fn compile_timeout(state: StateBuilder, after: f64, to: usize) -> StateBuilder {
+    let ms = (after * 1000.0) as u64;
+    state.timeout(Duration::from_millis(ms), to)
 }
 
 fn with_any(base: &Transitions, any: &Transitions) -> Transitions {

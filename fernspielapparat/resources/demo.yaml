@@ -7,7 +7,9 @@ states:
       They have launched the missiles.
       What are your orders?
   panicking:
-    speech: Are you still there, Lieutenant Petrow?
+    speech: Are you still there?
+  continue_panicking:
+    speech: Lieutenant Petrow? What are your orders? You must decide.
   hung_up:
 
 initial: ring
@@ -15,16 +17,18 @@ initial: ring
 transitions:
   ring:
     timeout:
-      after: 1.0
+      after: 1.5
       to: ring
   speaking:
     timeout:
       after: 10.0
       to: panicking
   panicking:
+    end: continue_panicking
+  continue_panicking:
     timeout:
       after: 15.0
-      to: panicking
+      to: continue_panicking
   hung_up:
     timeout:
       after: 60.0

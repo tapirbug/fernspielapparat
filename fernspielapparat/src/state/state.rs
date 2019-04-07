@@ -1,5 +1,5 @@
 use crate::sense::Input;
-use builder::StateBuilder;
+pub use builder::StateBuilder;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -13,6 +13,9 @@ pub struct State {
     // If some, transitions to the state with the name
     // after duration.
     timeout_transition: Option<(Duration, usize)>,
+    /// Transition to make after the speech has been
+    /// spoken.
+    transition_end: Option<usize>,
     ring_time: Option<Duration>,
     terminal: bool,
 }
@@ -52,6 +55,10 @@ impl State {
         None
     }
 
+    pub fn transition_end(&self) -> Option<usize> {
+        self.transition_end
+    }
+
     pub fn is_terminal(&self) -> bool {
         self.terminal
     }
@@ -88,6 +95,11 @@ mod builder {
 
         pub fn timeout(mut self, after_duration: Duration, transition_to: usize) -> Self {
             self.state.timeout_transition = Some((after_duration, transition_to));
+            self
+        }
+
+        pub fn end(mut self, transition_to: usize) -> Self {
+            self.state.transition_end = Some(transition_to);
             self
         }
 
