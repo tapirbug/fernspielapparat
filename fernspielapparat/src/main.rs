@@ -4,9 +4,9 @@ extern crate cute_log;
 extern crate failure;
 extern crate i2c_linux;
 extern crate log;
-extern crate tavla;
 extern crate serde;
 extern crate serde_yaml;
+extern crate tavla;
 
 mod act;
 mod book;
@@ -17,7 +17,7 @@ mod state;
 
 use crate::act::Actuators;
 use crate::phone::Phone;
-use crate::sense::{init_sensors, Input};
+use crate::sense::init_sensors;
 use crate::state::{Machine, State};
 use clap::{crate_authors, crate_name, crate_version, App, Arg};
 use failure::Error;
@@ -38,18 +38,22 @@ fn bootstrap() -> Result<(), Error> {
         .version(crate_version!())
         .about("Runtime environment for fernspielapparat phonebooks.")
         .author(crate_authors!())
-        .arg(Arg::with_name("phonebook")
-            .help("Path to the phone book to use")
-            .required(true)
-            .conflicts_with("default"))
-        .arg(Arg::with_name("default")
-            .short("d")
-            .long("default")
-            .help("Loads the default phonebook at startup")
-            .conflicts_with("phonebook"))
+        .arg(
+            Arg::with_name("phonebook")
+                .help("Path to the phone book to use")
+                .required(true)
+                .conflicts_with("default"),
+        )
+        .arg(
+            Arg::with_name("default")
+                .short("d")
+                .long("default")
+                .help("Loads the default phonebook at startup")
+                .conflicts_with("phonebook"),
+        )
         .arg(Arg::with_name("test").short("t").long("test").help(
             "Lets the phone ring and speak for one second as a basic hardware \
-            check, then exits.",
+             check, then exits.",
         ))
         .arg(
             Arg::with_name("quiet")
@@ -105,11 +109,7 @@ fn launch(states: Vec<State>) -> Result<(), Error> {
 
     let actuators = Actuators::new(&phone);
     let sensors = init_sensors(&phone);
-    let mut machine = Machine::new(
-        sensors,
-        actuators,
-        states,
-    );
+    let mut machine = Machine::new(sensors, actuators, states);
 
     while machine.update() {
         sleep(Duration::from_millis(10));

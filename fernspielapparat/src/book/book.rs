@@ -1,7 +1,7 @@
-use std::path::PathBuf;
-use std::collections::HashMap;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fmt;
+use std::path::PathBuf;
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Deserialize)]
 #[serde(transparent)]
@@ -25,7 +25,7 @@ pub struct Book {
     pub terminal: Option<StateId>,
     pub states: HashMap<StateId, Option<State>>,
     #[serde(default)]
-    pub transitions: HashMap<StateId, Transitions>
+    pub transitions: HashMap<StateId, Transitions>,
 }
 
 #[derive(Deserialize, Default)]
@@ -37,7 +37,7 @@ pub struct State {
     pub lights: Lighting,
     /// Ringing time in seconds
     #[serde(default)]
-    pub ring: f64
+    pub ring: f64,
 }
 
 #[derive(Deserialize, Default)]
@@ -47,7 +47,7 @@ pub struct Lighting {
     #[serde(default)]
     pub excitement: i8,
     #[serde(default)]
-    pub mood: i8
+    pub mood: i8,
 }
 
 #[derive(Deserialize, Default)]
@@ -59,14 +59,14 @@ pub struct Transitions {
     pub hang_up: Option<StateId>,
     /// When all actuators are done.
     pub end: Option<StateId>,
-    pub timeout: Option<Timeout>
+    pub timeout: Option<Timeout>,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct Timeout {
     /// Time in seconds.
     pub after: f64,
-    pub to: StateId
+    pub to: StateId,
 }
 
 #[cfg(test)]
@@ -76,26 +76,25 @@ mod test {
 
     #[test]
     fn deserialize_example_book() {
-        let _book : Book = from_str(include_str!("../../test/testbook_full.yaml"))
+        let _book: Book = from_str(include_str!("../../test/testbook_full.yaml"))
             .expect("Expected the example book to work");
     }
 
     #[test]
     fn deserialize_default_book() {
-        let _book : Book = from_str(include_str!("../../resources/default.yaml"))
+        let _book: Book = from_str(include_str!("../../resources/default.yaml"))
             .expect("Expected the default book to work");
     }
 
     #[test]
     fn deserialize_without_initial_and_transitions() {
-        let _book : Book = from_str(include_str!("../../test/testbook_only_states.yaml"))
+        let _book: Book = from_str(include_str!("../../test/testbook_only_states.yaml"))
             .expect("Could not deserialize");
     }
 
     #[should_panic]
     #[test]
     fn deserialize_empty_should_fail() {
-        let _book : Book = from_str("")
-            .expect("Could not deserialize");
+        let _book: Book = from_str("").expect("Could not deserialize");
     }
 }
