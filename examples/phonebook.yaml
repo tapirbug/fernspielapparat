@@ -37,7 +37,7 @@ states:
       # have no effect at all, depending on the  lights
       mood: 0
     # We will speak some text embedded in this file.
-    # You can *emphasize* and make pauses with more than
+    # You can _emphasize_ and make pauses with more than
     # one consecutive dot, e.g. dramatic.... pause will
     # be not very dramatic because it is quite long and
     # people probably already thought you were done talking.
@@ -50,13 +50,13 @@ states:
       Welcome, you have reached the suicide cell service
       hotline, how may we help you?
 
-      Press *one* if your machine does not work for you
+      Press _one_ if your machine does not work for you
       as intended and you require technical support..
 
-      Press *two* if you changed your mind and want your
+      Press _two_ if you changed your mind and want your
       suicide fee refunded..
 
-      Press *three* to learn more about the history of
+      Press _three_ to learn more about the history of
       McKillys Suicide Cells to the soothing music of
       Phil Colins. Actually we cannot play Phil Colins
       to you. But you can hear something old enough to
@@ -100,7 +100,7 @@ states:
       <ring>
       Never gonna give you up.
       Never gonna let you down.
-      Never gonna run around and *desert* you.
+      Never gonna run around and _desert_ you.
       Never gonna make you cry.
       Never gonna say goodbye.
       # And also unring it with </ring>
