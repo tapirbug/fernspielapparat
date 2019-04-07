@@ -41,11 +41,6 @@ states:
     # one consecutive dot, e.g. dramatic.... pause will
     # be not very dramatic because it is quite long and
     # people probably already thought you were done talking.
-    # Text will be sent on repeat, but you can stop
-    # talking indefinitely if you introduce the five
-    # characters <end> exactly like they were written
-    # here at the point in the text where you want to
-    # stop talking (really only makes sense at the end).
     speech: >
       Welcome, you have reached the suicide cell service
       hotline, how may we help you?
@@ -80,7 +75,7 @@ states:
   # New state starts here
   techsupport:
     # No lights here, all at 0 by default
-    speech: "Tech support is currently unreachable. <end>"
+    speech: "Tech support is currently unreachable."
 
   # refunds is also a state
   refunds:
@@ -88,28 +83,19 @@ states:
     # no effect
     lights:
       mood: 0
-    speech: "Hahahaha. Hahahahaha. Ha.. Ha.. No. No. Absolutely not. <end>"
+    speech: "Hahahaha. Hahahahaha. Ha.. Ha.. No. No. Absolutely not."
 
   # and history is a state
   history:
     lights:
       party: 100
     speech: >
-      # You can let the phone ring with <ring>
-      # for dramatic effect
-      <ring>
       Never gonna give you up.
       Never gonna let you down.
       Never gonna run around and _desert_ you.
       Never gonna make you cry.
       Never gonna say goodbye.
-      # And also unring it with </ring>
-      # It will after 2.5s if the end tag is left out
-      </ring>
       Never gonna tell a lie and hurt you
-      # Instead of 2.5s you can choose the maximum
-      # ringing time yourself like this:
-      <ring 5.1> 
 
 # From the states we just defined, we pick one that
 # is the start of the story. If you do not define
@@ -132,7 +118,7 @@ transitions:
       2: refunds
       3: history
   techsupport:
-    # When encountering <end>, the transition in "end" will be made
+    # When encountering end of speech, the transition in "end" will be made
     # If nothing is defined, talking will stop, but no transition
     # is made
     end: announcement
