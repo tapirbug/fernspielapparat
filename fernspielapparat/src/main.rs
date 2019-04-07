@@ -26,6 +26,7 @@ use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
+use tavla::{Voice, Speech};
 
 fn main() {
     if bootstrap().is_err() {
@@ -42,14 +43,14 @@ fn bootstrap() -> Result<(), Error> {
             Arg::with_name("phonebook")
                 .help("Path to the phone book to use")
                 .required(true)
-                .conflicts_with("demo"),
+                .conflicts_with("demo")
+                .conflicts_with("test"),
         )
         .arg(
             Arg::with_name("demo")
                 .short("d")
                 .long("demo")
-                .help("Loads a demo phonebook instead of a file")
-                .conflicts_with("phonebook"),
+                .help("Loads a demo phonebook instead of a file"),
         )
         .arg(Arg::with_name("test").short("t").long("test").help(
             "Lets the phone ring and speak for one second as a basic hardware \
@@ -79,7 +80,16 @@ fn bootstrap() -> Result<(), Error> {
     init_logging(verbosity_level);
 
     if matches.is_present("test") {
-        check_phone()
+        let check_result = check_phone()
+            .and(check_speech());
+
+        if check_result.is_ok() {
+            info!("Systems check successful.");
+        } else {
+            error!("Systems check failure.");
+        }
+
+        check_result
     } else {
         let states = if matches.is_present("demo") {
             book::from_str(include_str!("../resources/demo.yaml"))?
@@ -146,6 +156,24 @@ fn check_phone() -> Result<(), Error> {
     }
 
     Ok(test_result?)
+}
+
+fn check_speech() -> Result<(), Error> {
+    info!("Testing speech synthesizer...");
+
+    let test_result = tavla::any_voice()
+        .and_then(|v| Ok(v.speak("This is fernspielapparat speaking.")?.await_done()?));
+
+    match test_result {
+        Ok(_) => {
+            info!("Speech synthesis ok.");
+            Ok(())
+        },
+        Err(e) => {
+            error!("Speech synthesis failed: {}.", e);
+            Err(From::from(e))
+        }
+    }
 }
 
 fn init_logging(verbosity_level: Option<u64>) {
