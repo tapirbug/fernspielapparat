@@ -34,7 +34,7 @@ mod test {
 
     #[test]
     fn can_compile_default() {
-        let states = from_str(include_str!("../../resources/default.yaml")).unwrap();
+        let states = from_str(include_str!("../../resources/demo.yaml")).unwrap();
 
         assert_eq!(states[0].name(), "ring");
     }

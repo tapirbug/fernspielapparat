@@ -45,10 +45,10 @@ fn bootstrap() -> Result<(), Error> {
                 .conflicts_with("default"),
         )
         .arg(
-            Arg::with_name("default")
+            Arg::with_name("demo")
                 .short("d")
-                .long("default")
-                .help("Loads the default phonebook at startup")
+                .long("demo")
+                .help("Loads a demo phonebook instead of a file")
                 .conflicts_with("phonebook"),
         )
         .arg(Arg::with_name("test").short("t").long("test").help(
@@ -81,8 +81,8 @@ fn bootstrap() -> Result<(), Error> {
     if matches.is_present("test") {
         check_phone()
     } else {
-        let states = if matches.is_present("default") {
-            book::from_str(include_str!("../resources/default.yaml"))?
+        let states = if matches.is_present("demo") {
+            book::from_str(include_str!("../resources/demo.yaml"))?
         } else {
             book::from_path(matches.value_of("phonebook").unwrap())?
         };

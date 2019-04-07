@@ -82,7 +82,7 @@ mod test {
 
     #[test]
     fn deserialize_default_book() {
-        let _book: Book = from_str(include_str!("../../resources/default.yaml"))
+        let _book: Book = from_str(include_str!("../../resources/demo.yaml"))
             .expect("Expected the default book to work");
     }
 
