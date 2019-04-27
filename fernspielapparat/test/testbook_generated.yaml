@@ -1,0 +1,32 @@
+initial: "afe30063-b562-4681-80c6-a784cea5af5c"
+states:
+  afe30063-b562-4681-80c6-a784cea5af5c:
+    name: "ring"
+    description: ""
+    speech: ""
+    ring: 0.5
+    terminal: false
+  1920d413-6d7e-4d6f-b79f-7c9743017a60:
+    name: "New state"
+    description: ""
+    speech: "Thanks for picking up there"
+    terminal: false
+transitions:
+  afe30063-b562-4681-80c6-a784cea5af5c:
+    timeout:
+      after: 1.5
+      to: "afe30063-b562-4681-80c6-a784cea5af5c"
+    pick_up: "1920d413-6d7e-4d6f-b79f-7c9743017a60"
+  1920d413-6d7e-4d6f-b79f-7c9743017a60: {}
+vendor:
+  fernspieleditor:
+    afe30063-b562-4681-80c6-a784cea5af5c:
+      network:
+        position:
+          x: 201
+          y: 301
+    1920d413-6d7e-4d6f-b79f-7c9743017a60:
+      network:
+        position:
+          x: 406
+          y: 389

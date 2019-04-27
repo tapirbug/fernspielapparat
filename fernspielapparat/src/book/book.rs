@@ -30,6 +30,9 @@ pub struct Book {
 
 #[derive(Deserialize, Default)]
 pub struct State {
+    /// Name of the state, does not have to be unique.
+    #[serde(default)]
+    pub name: String,
     #[serde(default)]
     pub speech: String,
     pub speech_file: Option<PathBuf>,

@@ -66,7 +66,7 @@ fn compile_state(
     terminal: bool,
 ) -> Result<State, Error> {
     let mut state = State::builder()
-        .name(format!("{}", state_id))
+        .name(if spec.name.is_empty() { format!("{}", state_id) } else { spec.name.clone() })
         .speech(spec.speech.clone())
         .terminal(terminal);
     // TODO speech_file
