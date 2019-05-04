@@ -46,7 +46,7 @@ impl Actuators {
     }
 
     /// Returns `true` all acts are done or have been cancelled.
-    /// 
+    ///
     /// Returns `false` if some actuators are still working, e.g.
     /// speech is still ongoing.
     pub fn done(&self) -> bool {

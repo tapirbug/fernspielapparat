@@ -40,6 +40,8 @@ impl Sensors {
 }
 
 mod builder {
+    const POLL_INTERVAL: Duration = Duration::from_millis(150);
+
     use super::{Sense, Sensors};
     use crate::sense::bg::BackgroundSense;
     use std::time::Duration;
@@ -69,7 +71,7 @@ mod builder {
             Sensors(
                 self.may_block
                     .into_iter()
-                    .map(|sensor| BackgroundSense::spawn(sensor, Some(Duration::from_millis(50)))) // No more than 20 inputs/second
+                    .map(|sensor| BackgroundSense::spawn(sensor, Some(POLL_INTERVAL)))
                     .collect(),
             )
         }

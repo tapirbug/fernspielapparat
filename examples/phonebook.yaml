@@ -124,7 +124,7 @@ transitions:
     end: announcement
   refunds:
     end: announcement
-  # history:
+  history: {}
     # No transitions, this is an end state.
     # Any state is considered an end state that has no
     # transitions to it, but is not the initial state.

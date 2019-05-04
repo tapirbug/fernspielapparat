@@ -17,12 +17,13 @@ pub struct Phone {
 enum Msg {
     StartRing,
     StopRing,
+    //ShortRing,
 }
 
 impl Msg {
     fn into_u8(&self) -> u8 {
         match self {
-            // FIXME the real bytes
+            //Msg::ShortRing => 2,
             Msg::StartRing => 1,
             Msg::StopRing => 0,
         }
@@ -49,7 +50,8 @@ impl Phone {
     /// For a healthy connection, this should always
     /// return something, e.g. consecutive hangups.
     pub fn poll(&mut self) -> Result<Input> {
-        try_121_safe(self.retries_121, || self.i2c.smbus_read_byte()).and_then(Self::decode_input)
+        try_121_safe(self.retries_121, || self.i2c.smbus_read_byte_data(3))
+            .and_then(Self::decode_input)
     }
 
     pub fn ring(&mut self) -> Result<()> {
@@ -71,15 +73,21 @@ impl Phone {
 
     fn decode_input(byte: u8) -> Result<Input> {
         match byte {
-            // FIXME the real bytes for digits
-            digit @ b'0'..=b'9' => Ok(
+            digit @ 0..=9 => Ok(
                 // Always in range [0,9], unwrap is safe
-                Input::digit(digit - b'0').unwrap(),
+                Input::digit(digit - 0).unwrap(),
             ),
+            // 10 => // TODO general error
             11 => Ok(Input::hang_up()),
             12 => Ok(Input::pick_up()),
+            //13 => // TODO RECALL PRESS
+            //14 => // TODO RECALL RELEASE
+            255 => Err(Error::new(
+                ErrorKind::WouldBlock,
+                "Phone send buffer was empty",
+            )),
             _ => Err(Error::new(
-                ErrorKind::InvalidData,
+                ErrorKind::WouldBlock,
                 format!("Phone sent bad byte {}", byte),
             )),
         }

@@ -66,13 +66,16 @@ fn compile_state(
     terminal: bool,
 ) -> Result<State, Error> {
     let mut state = State::builder()
-        .name(if spec.name.is_empty() { format!("{}", state_id) } else { spec.name.clone() })
+        .name(if spec.name.is_empty() {
+            format!("{}", state_id)
+        } else {
+            spec.name.clone()
+        })
         .speech(spec.speech.clone())
         .terminal(terminal);
     // TODO speech_file
 
     state = compile_ring(state, spec.ring);
-
 
     if let Some(ref timeout) = transitions.timeout {
         state = lookup_state(defined_states, &timeout.to)
@@ -112,9 +115,9 @@ fn compile_state(
 
 fn lookup_state(defined_states: &[StateId], search_id: &StateId) -> Result<usize, Error> {
     defined_states
-            .iter()
-            .position(|id| id == search_id)
-            .ok_or_else(|| format_err!("Transition mentions unknown state: {}", search_id))
+        .iter()
+        .position(|id| id == search_id)
+        .ok_or_else(|| format_err!("Transition mentions unknown state: {}", search_id))
 }
 
 fn compile_ring(state: StateBuilder, ring: f64) -> StateBuilder {

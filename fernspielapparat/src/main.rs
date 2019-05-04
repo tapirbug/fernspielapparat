@@ -26,7 +26,7 @@ use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
-use tavla::{Voice, Speech};
+use tavla::{Speech, Voice};
 
 fn main() {
     if bootstrap().is_err() {
@@ -71,7 +71,6 @@ fn bootstrap() -> Result<(), Error> {
                 .conflicts_with("quiet"),
         )
         .get_matches();
-
     let verbosity_level = if matches.is_present("quiet") {
         None
     } else {
@@ -80,8 +79,7 @@ fn bootstrap() -> Result<(), Error> {
     init_logging(verbosity_level);
 
     if matches.is_present("test") {
-        let check_result = check_phone()
-            .and(check_speech());
+        let check_result = check_phone().and(check_speech());
 
         if check_result.is_ok() {
             info!("Systems check successful.");
@@ -91,15 +89,14 @@ fn bootstrap() -> Result<(), Error> {
 
         check_result
     } else {
-        let states = if matches.is_present("demo") {
-            book::from_str(include_str!("../resources/demo.yaml"))?
+        let phonebook = if matches.is_present("demo") {
+            book::from_str(include_str!("../resources/demo.yaml"))
         } else {
-            book::from_path(matches.value_of("phonebook").unwrap())?
+            book::from_path(matches.value_of("phonebook").unwrap())
         };
 
-        debug!("{:?}", &states);
+        let result = phonebook.and_then(launch);
 
-        let result = launch(states);
         match result {
             Ok(_) => debug!("Exiting after normal operation."),
             Err(ref err) => log_error(err),
@@ -161,14 +158,16 @@ fn check_phone() -> Result<(), Error> {
 fn check_speech() -> Result<(), Error> {
     info!("Testing speech synthesizer...");
 
-    let test_result = tavla::any_voice()
-        .and_then(|v| Ok(v.speak("This is fernspielapparat speaking.")?.await_done()?));
+    let test_result = tavla::any_voice().and_then(|v| {
+        Ok(v.speak("This is fernspielapparat speaking.")?
+            .await_done()?)
+    });
 
     match test_result {
         Ok(_) => {
             info!("Speech synthesis ok.");
             Ok(())
-        },
+        }
         Err(e) => {
             error!("Speech synthesis failed: {}.", e);
             Err(From::from(e))

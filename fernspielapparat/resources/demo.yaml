@@ -11,6 +11,7 @@ states:
   continue_panicking:
     speech: Lieutenant Petrow? What are your orders? You must decide.
   hung_up:
+    terminal: true
 
 initial: ring
 
