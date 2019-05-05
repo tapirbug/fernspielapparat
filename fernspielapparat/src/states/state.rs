@@ -1,6 +1,7 @@
 use crate::senses::Input;
 pub use builder::StateBuilder;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 #[derive(Default, Debug)]
@@ -8,6 +9,9 @@ pub struct State {
     /// Name of this state, not guaranteed to be unique.
     name: String,
     speech: String,
+    // keep_progressed_time: bool
+    content: Vec<PathBuf>,
+    environment: Vec<PathBuf>,
     /// Inputs against states to transition to
     input_transitions: HashMap<Input, usize>,
     /// If some, transitions to the state with the index
@@ -39,6 +43,14 @@ impl State {
         self.ring_time
     }
 
+    pub fn content(&self) -> &[PathBuf] {
+        &self.content
+    }
+
+    pub fn environment(&self) -> &[PathBuf] {
+        &self.environment
+    }
+
     /// Returns a transition target ID or `None` for no
     /// transition.
     pub fn transition_for_input(&self, input: Input) -> Option<usize> {
@@ -68,6 +80,7 @@ impl State {
 
 mod builder {
     use super::{Duration, Input, State};
+    use std::path::{Path, PathBuf};
 
     pub struct StateBuilder {
         state: State,
@@ -112,6 +125,30 @@ mod builder {
 
         pub fn ring_for(mut self, max_duration: Duration) -> Self {
             self.state.ring_time = Some(max_duration);
+            self
+        }
+
+        pub fn content_files<I, P>(mut self, files: I) -> Self
+        where
+            P: AsRef<Path>,
+            I: IntoIterator<Item = P>,
+        {
+            self.state
+                .content
+                .extend(files.into_iter().map(|p| PathBuf::from(p.as_ref())));
+
+            self
+        }
+
+        pub fn environment_files<I, P>(mut self, files: I) -> Self
+        where
+            P: AsRef<Path>,
+            I: IntoIterator<Item = P>,
+        {
+            self.state
+                .environment
+                .extend(files.into_iter().map(|p| PathBuf::from(p.as_ref())));
+
             self
         }
 

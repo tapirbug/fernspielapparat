@@ -127,7 +127,7 @@ impl Machine {
     /// Exits the current state.
     fn exit(&mut self) {
         self.actuators
-            .transition(Vec::new())
+            .transition_content(Vec::new())
             .expect("Exiting state failed");
     }
 }

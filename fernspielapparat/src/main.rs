@@ -2,6 +2,7 @@ extern crate clap;
 extern crate crossbeam_channel;
 extern crate ctrlc;
 extern crate cute_log;
+extern crate derivative;
 extern crate failure;
 extern crate i2c_linux;
 extern crate log;

@@ -1,22 +1,26 @@
-use crate::acts::{Act, Ring, Wait};
+use crate::acts::{Act, Ring, Sound, Wait};
 use crate::err::compound_result;
 use crate::phone::Phone;
 use crate::states::State;
 use failure::Error;
 use log::{debug, error, warn};
+use std::collections::HashSet;
 use std::mem::replace;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, PoisonError};
 use tavla::{any_voice, Voice};
 
 pub struct Actuators {
     active: Vec<Box<dyn Act>>,
+    active_environment: Vec<Sound>,
     phone: Option<Arc<Mutex<Phone>>>,
 }
 
 impl Actuators {
     pub fn new(phone: &Option<Arc<Mutex<Phone>>>) -> Self {
         Actuators {
-            active: Vec::new(),
+            active: vec![],
+            active_environment: vec![],
             phone: phone.as_ref().map(Arc::clone),
         }
     }
@@ -52,7 +56,9 @@ impl Actuators {
     }
 
     pub fn transition_to(&mut self, state: &State) -> Result<(), Error> {
-        self.transition(self.make_act_states(state))
+        self.transition_content(self.make_act_states(state))?;
+        self.transition_environment(state.environment().iter().cloned().collect())?;
+        Ok(())
     }
 
     fn make_act_states(&self, state: &State) -> Vec<Box<dyn Act>> {
@@ -66,6 +72,12 @@ impl Actuators {
                     .expect("Could not start speech for state"),
             ));
         }
+
+        state
+            .content()
+            .iter()
+            .map(Sound::new)
+            .for_each(|s| acts.push(Box::new(s)));
 
         if let Some(duration) = state.ring_time() {
             if let Some(phone) = self.phone.as_ref() {
@@ -81,10 +93,38 @@ impl Actuators {
         acts
     }
 
-    pub fn transition(&mut self, next_acts: Vec<Box<dyn Act>>) -> Result<(), Error> {
+    pub fn transition_content(&mut self, next_acts: Vec<Box<dyn Act>>) -> Result<(), Error> {
         if let Err(errs) = cancel_all(&mut replace(&mut self.active, next_acts)) {
             warn!("Some acts could not be cancelled: {}", errs);
         };
+        Ok(())
+    }
+
+    pub fn transition_environment(
+        &mut self,
+        next_environment: HashSet<PathBuf>,
+    ) -> Result<(), Error> {
+        // keep union of old and new
+        let (keeping_sounds, obsolete_sounds): (HashSet<_>, HashSet<_>) =
+            replace(&mut self.active_environment, vec![])
+                .into_iter()
+                .partition(|old| next_environment.contains(&PathBuf::from(old.source())));
+
+        compound_result(obsolete_sounds.into_iter().map(|mut a| a.cancel()))?;
+
+        let keeping: HashSet<PathBuf> = keeping_sounds
+            .iter()
+            .map(|k| PathBuf::from(k.source()))
+            .collect();
+
+        for potentially_new in next_environment.into_iter() {
+            if !keeping.contains(&potentially_new) {
+                self.active_environment.push(Sound::new(potentially_new))
+            }
+        }
+
+        self.active_environment.extend(keeping_sounds);
+
         Ok(())
     }
 }

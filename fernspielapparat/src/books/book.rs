@@ -41,6 +41,10 @@ pub struct State {
     /// Ringing time in seconds
     #[serde(default)]
     pub ring: f64,
+    #[serde(default)]
+    pub content: Vec<String>,
+    #[serde(default)]
+    pub environment: Vec<String>,
 }
 
 #[derive(Deserialize, Default)]

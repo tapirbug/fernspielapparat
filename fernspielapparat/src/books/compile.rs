@@ -3,6 +3,7 @@ use crate::senses::Input;
 use crate::states::{State, StateBuilder};
 use book::{Book, StateId, Transitions};
 use failure::{bail, format_err, Error};
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// Compiles the phone book into states.
@@ -69,8 +70,9 @@ fn compile_state(
             spec.name.clone()
         })
         .speech(spec.speech.clone())
-        .terminal(terminal);
-    // TODO speech_file
+        .terminal(terminal)
+        .content_files(spec.content.iter().map(PathBuf::from))
+        .environment_files(spec.content.iter().map(PathBuf::from));
 
     state = compile_ring(state, spec.ring);
 
