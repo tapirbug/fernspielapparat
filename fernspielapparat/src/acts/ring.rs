@@ -1,4 +1,4 @@
-use crate::act::Act;
+use crate::acts::Act;
 use crate::phone::Phone;
 use failure::Error;
 use std::sync::{Arc, Mutex};

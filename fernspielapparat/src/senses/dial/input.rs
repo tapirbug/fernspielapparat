@@ -17,9 +17,10 @@ impl Input {
         N: Into<i32>,
     {
         let num = number.into();
-        match num >= 0 && num < 10 {
-            true => Ok(Input::Digit(num as u8)),
-            false => Err(Error::DigitOutOfBounds(num)),
+        if num >= 0 && num < 10 {
+            Ok(Input::Digit(num as u8))
+        } else {
+            Err(Error::DigitOutOfBounds(num))
         }
     }
 

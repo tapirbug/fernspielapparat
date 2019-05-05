@@ -1,5 +1,5 @@
 use crate::phone::Phone;
-use crate::sense::{dial::Input, Error, Sense};
+use crate::senses::{dial::Input, Error, Sense};
 use log::warn;
 use std::io;
 use std::sync::{Arc, Mutex};

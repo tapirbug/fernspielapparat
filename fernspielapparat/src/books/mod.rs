@@ -1,6 +1,6 @@
 pub mod book;
 mod compile;
-use crate::state::State;
+use crate::states::State;
 use failure::Error;
 use serde_yaml;
 use std::path::PathBuf;

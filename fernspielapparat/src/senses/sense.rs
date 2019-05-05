@@ -1,4 +1,4 @@
-use crate::sense::{dial::Input, Error};
+use crate::senses::{dial::Input, Error};
 use std::result;
 
 type Result<T> = result::Result<T, Error>;

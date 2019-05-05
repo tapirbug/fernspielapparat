@@ -9,17 +9,17 @@ extern crate serde;
 extern crate serde_yaml;
 extern crate tavla;
 
-mod act;
-mod book;
+mod acts;
+mod books;
 mod err;
 mod phone;
-mod sense;
-mod state;
+mod senses;
+mod states;
 
-use crate::act::Actuators;
+use crate::acts::Actuators;
 use crate::phone::Phone;
-use crate::sense::init_sensors;
-use crate::state::{Machine, State};
+use crate::senses::init_sensors;
+use crate::states::{Machine, State};
 use clap::{crate_authors, crate_name, crate_version, App, Arg};
 use failure::Error;
 use log::{debug, error, info, warn, LevelFilter};
@@ -94,9 +94,9 @@ fn bootstrap() -> Result<(), Error> {
         check_result
     } else {
         let phonebook = if matches.is_present("demo") {
-            book::from_str(include_str!("../resources/demo.yaml"))
+            books::from_str(include_str!("../resources/demo.yaml"))
         } else {
-            book::from_path(matches.value_of("phonebook").unwrap())
+            books::from_path(matches.value_of("phonebook").unwrap())
         };
 
         let result = phonebook.and_then(launch);
@@ -195,7 +195,7 @@ fn check_speech() -> Result<(), Error> {
         }
         Err(e) => {
             error!("Speech synthesis failed: {}.", e);
-            Err(From::from(e))
+            Err(e)
         }
     }
 }

@@ -11,8 +11,7 @@ pub use wait::Wait;
 
 #[cfg(test)]
 mod test {
-    //use crate::act::bell::Bell;
-    use crate::act::Act;
+    use crate::acts::Act;
     use tavla::{any_voice, Voice};
 
     #[test]
@@ -28,10 +27,7 @@ mod test {
 
     #[test]
     fn make_act_vector() {
-        let acts: Vec<Box<dyn Act>> = vec![
-            //Box::new(Bell),
-            Box::new(any_voice().unwrap().speak("Heyo!").unwrap()),
-        ];
+        let acts: Vec<Box<dyn Act>> = vec![Box::new(any_voice().unwrap().speak("Heyo!").unwrap())];
 
         for mut act in acts {
             assert!(!act.done().unwrap());

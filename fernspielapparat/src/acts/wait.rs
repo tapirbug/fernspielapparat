@@ -1,4 +1,4 @@
-use crate::act::Act;
+use crate::acts::Act;
 use failure::Error;
 use std::time::{Duration, Instant};
 

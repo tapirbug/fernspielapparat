@@ -1,4 +1,4 @@
-use crate::sense::Input;
+use crate::senses::Input;
 use i2c_linux;
 use log::debug;
 use std::fs::File;
@@ -11,7 +11,7 @@ type I2c = i2c_linux::I2c<File>;
 
 // First wait 5ms, then 25, then 125, ... up  until 390_625ms
 const RETRIES: u32 = 8;
-const RETRY_BASE_MS: u32 = 5;
+const RETRY_BASE_MS: u64 = 5;
 
 pub struct Phone {
     i2c: I2c,
@@ -27,7 +27,7 @@ enum Msg {
 }
 
 impl Msg {
-    fn into_u8(&self) -> u8 {
+    fn as_u8(&self) -> u8 {
         match self {
             //Msg::ShortRing => 2,
             Msg::StartRing => 1,
@@ -72,7 +72,7 @@ impl Phone {
 
     fn send(&mut self, msg: Msg) -> Result<()> {
         with_retries(self.retries, || {
-            self.i2c.smbus_read_byte_data(msg.into_u8())?;
+            self.i2c.smbus_read_byte_data(msg.as_u8())?;
             Ok(())
         })
     }
@@ -81,7 +81,7 @@ impl Phone {
         match byte {
             digit @ 0..=9 => Ok(
                 // Always in range [0,9], unwrap is safe
-                Input::digit(digit - 0).unwrap(),
+                Input::digit(digit).unwrap(),
             ),
             // 10 => // TODO general error
             11 => Ok(Input::hang_up()),
@@ -112,7 +112,7 @@ where
             Err(e) => {
                 if e.raw_os_error() == Some(121) {
                     // 121, this may still succeed later, retry with exponential backoff
-                    sleep(Duration::from_millis(RETRY_BASE_MS.pow(attempt) as u64))
+                    sleep(Duration::from_millis(RETRY_BASE_MS.pow(attempt)))
                 } else {
                     // everything else is probably fatal
                     return Err(e);

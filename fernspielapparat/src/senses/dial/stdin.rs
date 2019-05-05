@@ -1,5 +1,5 @@
-use crate::sense::dial::Input;
-use crate::sense::{Error, Sense};
+use crate::senses::dial::Input;
+use crate::senses::{Error, Sense};
 use std::io::{stdin, Read};
 
 /// A dial that reads from stdin.

@@ -1,6 +1,6 @@
-use crate::book::book;
-use crate::sense::Input;
-use crate::state::{State, StateBuilder};
+use crate::books::book;
+use crate::senses::Input;
+use crate::states::{State, StateBuilder};
 use book::{Book, StateId, Transitions};
 use failure::{bail, format_err, Error};
 use std::time::Duration;
@@ -15,10 +15,7 @@ pub fn compile(mut book: Book) -> Result<Vec<State>, Error> {
         let initial_idx = states
             .iter()
             .position(|s| *s == book.initial)
-            .ok_or(format_err!(
-                "Intitial state {:?} is undefined",
-                book.initial
-            ))?;
+            .ok_or_else(|| format_err!("Intitial state {:?} is undefined", book.initial))?;
 
         if initial_idx != 0 {
             states.swap(initial_idx, 0);
@@ -145,18 +142,22 @@ fn with_any(base: &Transitions, any: &Transitions) -> Transitions {
     let pick_up = base
         .pick_up
         .as_ref()
-        .or(any.pick_up.as_ref())
+        .or_else(|| any.pick_up.as_ref())
         .map(Clone::clone);
     let hang_up = base
         .hang_up
         .as_ref()
-        .or(any.hang_up.as_ref())
+        .or_else(|| any.hang_up.as_ref())
         .map(Clone::clone);
-    let end = base.end.as_ref().or(any.end.as_ref()).map(Clone::clone);
+    let end = base
+        .end
+        .as_ref()
+        .or_else(|| any.end.as_ref())
+        .map(Clone::clone);
     let timeout = base
         .timeout
         .as_ref()
-        .or(any.timeout.as_ref())
+        .or_else(|| any.timeout.as_ref())
         .map(Clone::clone);
 
     Transitions {

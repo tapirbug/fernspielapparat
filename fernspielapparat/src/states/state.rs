@@ -1,4 +1,4 @@
-use crate::sense::Input;
+use crate::senses::Input;
 pub use builder::StateBuilder;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -42,7 +42,7 @@ impl State {
     /// Returns a transition target ID or `None` for no
     /// transition.
     pub fn transition_for_input(&self, input: Input) -> Option<usize> {
-        self.input_transitions.get(&input).map(|target| *target)
+        self.input_transitions.get(&input).copied()
     }
 
     /// Returns a transition target ID or `None` for no

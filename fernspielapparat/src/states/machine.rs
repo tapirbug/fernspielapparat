@@ -1,6 +1,6 @@
-use crate::act::Actuators;
-use crate::sense::Sensors;
-use crate::state::State;
+use crate::acts::Actuators;
+use crate::senses::Sensors;
+use crate::states::State;
 use log::debug;
 use std::time::Instant;
 
@@ -19,7 +19,7 @@ pub struct Machine {
 
 impl Machine {
     pub fn new(sensors: Sensors, actuators: Actuators, states: Vec<State>) -> Self {
-        assert!(states.len() > 0, "Expected at least one state");
+        assert!(!states.is_empty(), "Expected at least one state");
 
         let now = Instant::now();
         let mut machine = Machine {
@@ -84,9 +84,9 @@ impl Machine {
         };
 
         // If anything triggered a transition, perform it.
-        transition.map(|next_idx| {
+        if let Some(next_idx) = transition {
             self.transition_to(next_idx);
-        });
+        };
     }
 
     fn actuate(&mut self) {

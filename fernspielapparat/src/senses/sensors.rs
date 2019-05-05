@@ -1,5 +1,5 @@
-use crate::sense::dial::Input;
-use crate::sense::{Error, Sense};
+use crate::senses::dial::Input;
+use crate::senses::{Error, Sense};
 use builder::Builder;
 use log::error;
 
@@ -43,7 +43,7 @@ mod builder {
     const POLL_INTERVAL: Duration = Duration::from_millis(150);
 
     use super::{Sense, Sensors};
-    use crate::sense::bg::BackgroundSense;
+    use crate::senses::bg::BackgroundSense;
     use std::time::Duration;
 
     pub struct Builder {

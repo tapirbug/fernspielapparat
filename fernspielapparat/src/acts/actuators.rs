@@ -1,11 +1,11 @@
-use crate::act::{Act, Ring, Wait};
+use crate::acts::{Act, Ring, Wait};
 use crate::err::compound_result;
 use crate::phone::Phone;
-use crate::state::State;
+use crate::states::State;
 use failure::Error;
 use log::{debug, error, warn};
 use std::mem::replace;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use tavla::{any_voice, Voice};
 
 pub struct Actuators {
@@ -26,7 +26,7 @@ impl Actuators {
         let update_errs: Vec<_> = self
             .active
             .iter_mut()
-            .map(|a| a.update())
+            .map(|a| (*a).update())
             .filter_map(Result::err)
             .collect();
 
@@ -82,16 +82,15 @@ impl Actuators {
     }
 
     pub fn transition(&mut self, next_acts: Vec<Box<dyn Act>>) -> Result<(), Error> {
-        match cancel_all(&mut replace(&mut self.active, next_acts)) {
-            Err(errs) => warn!("Some acts could not be cancelled: {}", errs),
-            _ => (),
+        if let Err(errs) = cancel_all(&mut replace(&mut self.active, next_acts)) {
+            warn!("Some acts could not be cancelled: {}", errs);
         };
         Ok(())
     }
 }
 
 fn cancel_all(acts: &mut Vec<Box<dyn Act>>) -> Result<(), Error> {
-    compound_result(acts.into_iter().map(|a| a.cancel()))
+    compound_result(acts.iter_mut().map(|a| (*a).cancel()))
 }
 
 impl Drop for Actuators {
@@ -106,7 +105,7 @@ impl Drop for Actuators {
         if let Some(phone) = self.phone.take() {
             phone
                 .lock()
-                .unwrap_or_else(|e| e.into_inner())
+                .unwrap_or_else(PoisonError::into_inner)
                 .unring()
                 .unwrap_or_else(|e| warn!("Failed to unring phone at shutdown: {}", e));
         }
