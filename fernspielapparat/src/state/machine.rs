@@ -135,7 +135,7 @@ impl Machine {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::thread::{sleep, yield_now};
+    use std::thread::yield_now;
     use std::time::Duration;
     use tavla::{any_voice, Speech, Voice};
 

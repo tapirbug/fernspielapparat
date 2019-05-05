@@ -1,7 +1,6 @@
 use crate::act::Act;
 use crate::phone::Phone;
 use failure::Error;
-use log::warn;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -49,25 +48,14 @@ impl Act for Ring {
     }
 }
 
-impl Drop for Ring {
-    fn drop(&mut self) {
-        if !self.is_done {
-            self.stop()
-                .unwrap_or_else(|e| warn!("Failed to stop ringing at shutdown: {}", e));
-        }
-    }
-}
-
 impl Ring {
     fn start(&mut self) -> Result<(), Error> {
         let mut phone = self.phone.lock().expect("Failed to obtain lock on phone");
-
         Ok(phone.ring()?)
     }
 
     fn stop(&mut self) -> Result<(), Error> {
         let mut phone = self.phone.lock().expect("Failed to obtain lock on phone");
-
         Ok(phone.unring()?)
     }
 }

@@ -1,5 +1,6 @@
 extern crate clap;
 extern crate crossbeam_channel;
+extern crate ctrlc;
 extern crate cute_log;
 extern crate failure;
 extern crate i2c_linux;
@@ -23,7 +24,10 @@ use clap::{crate_authors, crate_name, crate_version, App, Arg};
 use failure::Error;
 use log::{debug, error, info, warn, LevelFilter};
 use std::process::exit;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicBool, Ordering::SeqCst},
+    Arc, Mutex,
+};
 use std::thread::sleep;
 use std::time::Duration;
 use tavla::{Speech, Voice};
@@ -106,6 +110,7 @@ fn bootstrap() -> Result<(), Error> {
 }
 
 fn launch(states: Vec<State>) -> Result<(), Error> {
+    let termination_requested = listen_for_termination_signal();
     let phone = Phone::new().ok().map(|p| Arc::new(Mutex::new(p)));
 
     if phone.is_some() {
@@ -114,15 +119,35 @@ fn launch(states: Vec<State>) -> Result<(), Error> {
         warn!("No phone available.");
     }
 
-    let actuators = Actuators::new(&phone);
     let sensors = init_sensors(&phone);
+    let actuators = Actuators::new(&phone);
     let mut machine = Machine::new(sensors, actuators, states);
 
-    while machine.update() {
+    while !termination_requested.load(SeqCst) && machine.update() {
         sleep(Duration::from_millis(10));
     }
 
     Ok(())
+}
+
+fn listen_for_termination_signal() -> Arc<AtomicBool> {
+    let termination_requested = Arc::new(AtomicBool::new(false));
+
+    let termination_requested_handler_reference = Arc::clone(&termination_requested);
+    let result = ctrlc::set_handler(move || {
+        termination_requested_handler_reference.store(true, SeqCst);
+    });
+
+    if let Err(e) = result {
+        warn!(
+            "Failed to set up signal handler for safe termination. \
+             The phone may keep ringing after termination. \
+             Error: {:?}",
+            e
+        )
+    }
+
+    termination_requested
 }
 
 fn log_error(error: &Error) {

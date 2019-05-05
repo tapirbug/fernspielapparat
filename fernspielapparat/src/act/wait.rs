@@ -21,7 +21,7 @@ impl Wait {
 
 impl Act for Wait {
     fn update(&mut self) -> Result<(), Error> {
-        if (!self.done && self.start.elapsed().gt(&self.duration)) {
+        if !self.done && self.start.elapsed().gt(&self.duration) {
             self.done = true;
         }
         Ok(())

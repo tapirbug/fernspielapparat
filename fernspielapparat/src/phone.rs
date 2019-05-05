@@ -1,17 +1,23 @@
 use crate::sense::Input;
 use i2c_linux;
+use log::debug;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
+use std::thread::sleep;
 use std::time::Duration;
 
 type Result<T> = std::result::Result<T, Error>;
 type I2c = i2c_linux::I2c<File>;
 
+// First wait 5ms, then 25, then 125, ... up  until 390_625ms
+const RETRIES: u32 = 8;
+const RETRY_BASE_MS: u32 = 5;
+
 pub struct Phone {
     i2c: I2c,
     /// Error code 121 is apparently returned from SMBus if
     /// no partner sent ACK. Retry a few times if this happens.
-    retries_121: u64,
+    retries: u32,
 }
 
 enum Msg {
@@ -34,13 +40,10 @@ impl Phone {
     pub fn new() -> Result<Self> {
         let mut i2c = I2c::from_path("/dev/i2c-1")?;
         i2c.smbus_set_slave_address(4, false)?;
-        // Reads should not block for longer than ten millis so
-        // writers get a chance to write, e.g. for ringing.
-        i2c.i2c_set_timeout(Duration::from_millis(50))?;
 
         Ok(Phone {
             i2c,
-            retries_121: 25,
+            retries: RETRIES,
         })
     }
 
@@ -50,23 +53,26 @@ impl Phone {
     /// For a healthy connection, this should always
     /// return something, e.g. consecutive hangups.
     pub fn poll(&mut self) -> Result<Input> {
-        try_121_safe(self.retries_121, || self.i2c.smbus_read_byte_data(3))
-            .and_then(Self::decode_input)
+        with_retries(self.retries, || self.i2c.smbus_read_byte_data(3)).and_then(Self::decode_input)
     }
 
     pub fn ring(&mut self) -> Result<()> {
-        try_121_safe(self.retries_121, || self.send(Msg::StartRing))
+        with_retries(self.retries, || {
+            debug!("Ring start");
+            self.send(Msg::StartRing)
+        })
     }
 
     pub fn unring(&mut self) -> Result<()> {
-        try_121_safe(self.retries_121, || self.send(Msg::StopRing))
+        with_retries(self.retries, || {
+            debug!("Ring end");
+            self.send(Msg::StopRing)
+        })
     }
 
     fn send(&mut self, msg: Msg) -> Result<()> {
-        try_121_safe(self.retries_121, || {
-            self.i2c
-                .smbus_write_byte_data(msg.into_u8(), msg.into_u8())?;
-            self.i2c.smbus_read_byte()?;
+        with_retries(self.retries, || {
+            self.i2c.smbus_read_byte_data(msg.into_u8())?;
             Ok(())
         })
     }
@@ -94,19 +100,19 @@ impl Phone {
     }
 }
 
-fn try_121_safe<F, R>(retries: u64, mut trial: F) -> Result<R>
+fn with_retries<F, R>(retries: u32, mut trial: F) -> Result<R>
 where
     F: FnMut() -> Result<R>,
 {
     // Ignore errors retries minus 1 times
-    for _ in 1..retries {
+    for attempt in 1_u32..retries {
         match trial() {
             // Succeeded, ok
             ok @ Ok(_) => return ok,
             Err(e) => {
                 if e.raw_os_error() == Some(121) {
-                    // 121, this may still succeed later
-                    ()
+                    // 121, this may still succeed later, retry with exponential backoff
+                    sleep(Duration::from_millis(RETRY_BASE_MS.pow(attempt) as u64))
                 } else {
                     // everything else is probably fatal
                     return Err(e);

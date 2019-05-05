@@ -3,8 +3,7 @@ use crate::err::compound_result;
 use crate::phone::Phone;
 use crate::state::State;
 use failure::Error;
-use log::{error, warn};
-use std::fmt::Debug;
+use log::{debug, error, warn};
 use std::mem::replace;
 use std::sync::{Arc, Mutex};
 use tavla::{any_voice, Voice};
@@ -14,7 +13,6 @@ pub struct Actuators {
     phone: Option<Arc<Mutex<Phone>>>,
 }
 
-#[allow(dead_code)]
 impl Actuators {
     pub fn new(phone: &Option<Arc<Mutex<Phone>>>) -> Self {
         Actuators {
@@ -90,34 +88,27 @@ impl Actuators {
         };
         Ok(())
     }
-
-    pub fn transition_with_makers<I, F, A>(&mut self, act_makers: I) -> Result<(), Error>
-    where
-        I: IntoIterator<Item = F>,
-        F: FnOnce() -> A,
-        A: Act + 'static + Debug,
-    {
-        let boxed = act_makers.into_iter().map(instantiate);
-
-        self.transition_iter(boxed)
-    }
-
-    pub fn transition_iter<I>(&mut self, next_acts: I) -> Result<(), Error>
-    where
-        I: IntoIterator<Item = Box<dyn Act>>,
-    {
-        self.transition(next_acts.into_iter().collect())
-    }
 }
 
 fn cancel_all(acts: &mut Vec<Box<dyn Act>>) -> Result<(), Error> {
     compound_result(acts.into_iter().map(|a| a.cancel()))
 }
 
-fn instantiate<F, A>(maker: F) -> Box<dyn Act>
-where
-    F: FnOnce() -> A,
-    A: Act + 'static + Debug,
-{
-    Box::new(maker())
+impl Drop for Actuators {
+    fn drop(&mut self) {
+        let mut acts = &mut replace(&mut self.active, vec![]);
+
+        match cancel_all(&mut acts) {
+            Ok(_) => debug!("Actuators dropped at shutdown"),
+            Err(e) => warn!("Failed to stop actuators at shutdown: {}", e),
+        }
+
+        if let Some(phone) = self.phone.take() {
+            phone
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .unring()
+                .unwrap_or_else(|e| warn!("Failed to unring phone at shutdown: {}", e));
+        }
+    }
 }
