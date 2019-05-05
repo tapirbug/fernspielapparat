@@ -79,17 +79,23 @@ fn compile_state(
             .map(|idx| compile_timeout(state, timeout.after, idx))?
     }
 
-    for (input, target_id) in transitions.dial.iter() {
-        let target_idx = lookup_state(defined_states, target_id)?;
+    for (dial_pattern, target_id) in transitions.dial.iter() {
+        let mut pattern_digits = dial_pattern.chars().filter(|c| *c >= '0' && *c <= '9');
+        let input = pattern_digits
+            .next()
+            .ok_or_else(|| format_err!("Pattern contained no digits: \"{}\"", dial_pattern))
+            .map(|c| (c as i32) - ('0' as i32))?;
 
-        if *input > 9 {
+        if pattern_digits.next().is_some() {
             bail!(
-                "Only digits in range 0--9 allowed for transitions, found: {}",
-                input
+                "Pattern can currently only consist of a single digit, but got: \"{}\"",
+                dial_pattern
             );
         }
 
-        state = state.input(Input::digit(*input)?, target_idx);
+        let target_idx = lookup_state(defined_states, target_id)?;
+
+        state = state.input(Input::digit(input)?, target_idx);
     }
 
     if let Some(ref target_id) = transitions.hang_up {
@@ -136,7 +142,7 @@ fn with_any(base: &Transitions, any: &Transitions) -> Transitions {
         .dial
         .iter()
         .chain(any.dial.iter())
-        .map(|(input, id)| (*input, id.clone()))
+        .map(|(input, id)| (input.clone(), id.clone()))
         .collect();
 
     let pick_up = base

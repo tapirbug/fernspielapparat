@@ -1,32 +1,78 @@
-initial: "afe30063-b562-4681-80c6-a784cea5af5c"
+initial: be1a9e13-cf8b-4dbb-b183-428d68f461bf
 states:
-  afe30063-b562-4681-80c6-a784cea5af5c:
-    name: "ring"
+  any:
+    name: Any
+    description: Transitions from any are used when the current state has no transition
+      defined for an event
+    speech: ""
+    ring: 0
+    terminal: false
+  219e9056-9abe-45ce-b35c-4b069f5c9019:
+    name: Pause
+    description: Does nothing for a while and rings again afterwards
+    speech: ""
+    ring: 0
+    terminal: false
+  5f578c31-a858-4ac2-9544-1e81e9729e0f:
+    name: Ring
     description: ""
     speech: ""
     ring: 0.5
     terminal: false
-  1920d413-6d7e-4d6f-b79f-7c9743017a60:
-    name: "New state"
+  be1a9e13-cf8b-4dbb-b183-428d68f461bf:
+    name: Speak
     description: ""
-    speech: "Thanks for picking up there"
+    speech: Who's there?
+    ring: 0
     terminal: false
+  08390793-59d2-4902-b264-a3cbe3bb29de:
+    name: |
+      Speak other thing
+    description: Transitions from any are used when the current state has no transition
+      defined for an event
+    speech: ""
+    terminal: false
+    id: 08390793-59d2-4902-b264-a3cbe3bb29de
 transitions:
-  afe30063-b562-4681-80c6-a784cea5af5c:
+  any:
+    hang_up: 219e9056-9abe-45ce-b35c-4b069f5c9019
+    pick_up: be1a9e13-cf8b-4dbb-b183-428d68f461bf
+  219e9056-9abe-45ce-b35c-4b069f5c9019:
+    timeout:
+      after: 60
+      to: 5f578c31-a858-4ac2-9544-1e81e9729e0f
+  5f578c31-a858-4ac2-9544-1e81e9729e0f:
     timeout:
       after: 1.5
-      to: "afe30063-b562-4681-80c6-a784cea5af5c"
-    pick_up: "1920d413-6d7e-4d6f-b79f-7c9743017a60"
-  1920d413-6d7e-4d6f-b79f-7c9743017a60: {}
+      to: 5f578c31-a858-4ac2-9544-1e81e9729e0f
+  be1a9e13-cf8b-4dbb-b183-428d68f461bf:
+    dial:
+      "1": 08390793-59d2-4902-b264-a3cbe3bb29de
+  08390793-59d2-4902-b264-a3cbe3bb29de: {}
 vendor:
   fernspieleditor:
-    afe30063-b562-4681-80c6-a784cea5af5c:
+    any:
       network:
         position:
-          x: 201
+          x: 99
+          y: 101
+    219e9056-9abe-45ce-b35c-4b069f5c9019:
+      network:
+        position:
+          x: 300
+          y: 101
+    5f578c31-a858-4ac2-9544-1e81e9729e0f:
+      network:
+        position:
+          x: 500
+          y: 100
+    be1a9e13-cf8b-4dbb-b183-428d68f461bf:
+      network:
+        position:
+          x: 500
           y: 301
-    1920d413-6d7e-4d6f-b79f-7c9743017a60:
+    08390793-59d2-4902-b264-a3cbe3bb29de:
       network:
         position:
-          x: 406
-          y: 389
+          x: 367
+          y: 532

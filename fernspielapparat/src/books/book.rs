@@ -57,7 +57,7 @@ pub struct Lighting {
 pub struct Transitions {
     /// When input in some format was received.
     #[serde(default)]
-    pub dial: HashMap<u8, StateId>,
+    pub dial: HashMap<String, StateId>,
     pub pick_up: Option<StateId>,
     pub hang_up: Option<StateId>,
     /// When all actuators are done.

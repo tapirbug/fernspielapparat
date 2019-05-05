@@ -31,6 +31,7 @@ mod file {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::senses::Input;
 
     #[test]
     fn can_compile_default() {
@@ -49,7 +50,15 @@ mod test {
     #[test]
     fn can_compile_generated() {
         let states = from_path("test/testbook_generated.yaml").unwrap();
+        let state_with_dial_1_transition = states.iter().find(|s| s.name() == "Speak").unwrap();
 
-        assert_eq!(states[0].name(), "ring");
+        let has_transition_for_1 = state_with_dial_1_transition
+            .transition_for_input(Input::digit(1).unwrap())
+            .is_some();
+
+        assert!(
+            has_transition_for_1,
+            "Expected transition for input 1 to be defined"
+        )
     }
 }
