@@ -5,13 +5,15 @@ use std::time::{Duration, Instant};
 
 #[derive(Default, Debug)]
 pub struct State {
-    // Name of this state, not guaranteed to be unique.
+    /// Name of this state, not guaranteed to be unique.
     name: String,
     speech: String,
-    // Inputs against states to transition to
+    /// Inputs against states to transition to
     input_transitions: HashMap<Input, usize>,
-    // If some, transitions to the state with the name
-    // after duration.
+    /// If some, transitions to the state with the index
+    /// after the specified duration has passed after the
+    /// end of speech and all other actuators such as
+    /// ringing.
     timeout_transition: Option<(Duration, usize)>,
     /// Transition to make after the speech has been
     /// spoken.

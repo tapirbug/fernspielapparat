@@ -2,10 +2,12 @@ mod act;
 mod actuators;
 mod ring;
 pub mod speech;
+mod wait;
 
 pub use act::Act;
 pub use actuators::Actuators;
 pub use ring::Ring;
+pub use wait::Wait;
 
 #[cfg(test)]
 mod test {

@@ -1,4 +1,4 @@
-use crate::act::{Act, Ring};
+use crate::act::{Act, Ring, Wait};
 use crate::err::compound_result;
 use crate::phone::Phone;
 use crate::state::State;
@@ -69,11 +69,14 @@ impl Actuators {
             ));
         }
 
-        if let Some(phone) = self.phone.as_ref() {
-            if let Some(duration) = state.ring_time() {
+        if let Some(duration) = state.ring_time() {
+            if let Some(phone) = self.phone.as_ref() {
                 acts.push(Box::new(
                     Ring::new(phone, duration).expect("Failed to start ring"),
                 ))
+            } else {
+                // If no real bell available, do a silent bell for timeout purposes only
+                acts.push(Box::new(Wait::new(duration)))
             }
         }
 
