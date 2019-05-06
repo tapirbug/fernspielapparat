@@ -45,13 +45,7 @@ pub fn compile(mut book: Book) -> Result<Vec<State>, Error> {
                 any_transition.as_ref().unwrap_or(&default_transition),
             );
 
-            let terminal = book
-                .terminal
-                .as_ref()
-                .map(|terminal| *id == *terminal)
-                .unwrap_or(false);
-
-            compile_state(&defined_states, id, state, &transitions, terminal)
+            compile_state(&defined_states, id, state, &transitions)
         })
         .collect()
 }
@@ -60,8 +54,7 @@ fn compile_state(
     defined_states: &[StateId],
     state_id: &StateId,
     spec: &book::State,
-    transitions: &Transitions,
-    terminal: bool,
+    transitions: &Transitions
 ) -> Result<State, Error> {
     let mut state = State::builder()
         .name(if spec.name.is_empty() {
@@ -70,7 +63,7 @@ fn compile_state(
             spec.name.clone()
         })
         .speech(spec.speech.clone())
-        .terminal(terminal)
+        .terminal(spec.terminal)
         .content_files(spec.content.iter().map(PathBuf::from))
         .environment_files(spec.content.iter().map(PathBuf::from));
 

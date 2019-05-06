@@ -22,7 +22,6 @@ impl fmt::Display for StateId {
 #[derive(Deserialize)]
 pub struct Book {
     pub initial: StateId,
-    pub terminal: Option<StateId>,
     pub states: HashMap<StateId, Option<State>>,
     #[serde(default)]
     pub transitions: HashMap<StateId, Transitions>,
@@ -41,6 +40,8 @@ pub struct State {
     /// Ringing time in seconds
     #[serde(default)]
     pub ring: f64,
+    #[serde(default)]
+    pub terminal: bool,
     #[serde(default)]
     pub content: Vec<String>,
     #[serde(default)]
