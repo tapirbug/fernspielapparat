@@ -1,22 +1,160 @@
-use crate::books::book;
+use crate::books::spec;
 use crate::senses::Input;
 use crate::states::{State, StateBuilder};
-use book::{Book, StateId, Transitions};
+pub use book::Book;
 use failure::{bail, format_err, Error};
-use std::path::PathBuf;
+use log::warn;
+use spec::{Id, Transitions};
+use std::collections::HashMap;
 use std::time::Duration;
 
-/// Compiles the phone book into states.
+mod book {
+    use crate::acts::SoundSpec;
+    use crate::books::spec;
+    use crate::states::State;
+    use failure::Error;
+    use log::debug;
+    use std::path::{Path, PathBuf};
+    use tavla::{any_voice, Speech, Voice};
+    use tempfile::{tempdir, TempDir};
+
+    pub struct Book {
+        pub(crate) states: Vec<State>,
+        sounds: Vec<SoundSpec>,
+        /// Get deleted when book is destroyed
+        compiled_speech_dir: TempDir,
+    }
+
+    impl Book {
+        pub fn builder() -> Result<BookBuilder, Error> {
+            let builder = BookBuilder {
+                book: Book {
+                    states: vec![],
+                    sounds: vec![],
+                    compiled_speech_dir: tempdir()?,
+                },
+            };
+            Ok(builder)
+        }
+
+        pub fn states(&self) -> &[State] {
+            &self.states
+        }
+
+        pub fn sounds(&self) -> &[SoundSpec] {
+            &self.sounds
+        }
+    }
+
+    pub struct BookBuilder {
+        book: Book,
+    }
+
+    impl BookBuilder {
+        pub fn state(&mut self, state: State) -> &mut Self {
+            self.book.states.push(state);
+            self
+        }
+
+        /// If the given sound spec describes text-to-speech, adds a
+        /// temporary file to the books temporary directory with the
+        /// speech content.
+        ///
+        /// The content file is then set to the given spec and its
+        /// speech text is removed.spec
+        fn prepare_sound(sound: &mut spec::Sound, cache_directory: &Path) -> Result<(), Error> {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::Hasher;
+
+            if let Some(text) = sound.speech.take() {
+                let mut hash = DefaultHasher::new();
+                hash.write(text.as_bytes());
+
+                let mut filename = PathBuf::from(cache_directory);
+                filename.push(format!("{}.wav", hash.finish()));
+
+                debug!("Preparing {:?}...", &filename);
+                debug!("Text: {:?}", text);
+                let voice = any_voice()?;
+                voice.speak_to_file(text, &filename)?.await_done()?;
+
+                sound.file = filename;
+            }
+
+            Ok(())
+        }
+
+        pub fn sound(&mut self, mut sound: spec::Sound) -> Result<&mut Self, Error> {
+            use std::time::Duration;
+
+            let cache_directory: &Path = self.book.compiled_speech_dir.as_ref();
+            Self::prepare_sound(&mut sound, cache_directory)?;
+            let path = sound.file.clone();
+            let offset = Duration::from_millis(0);
+            self.book.sounds.push(if sound.looping {
+                SoundSpec::repeat(path)
+            } else {
+                SoundSpec::once(path, offset)
+            });
+            Ok(self)
+        }
+
+        pub fn build(self) -> Book {
+            self.book
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        #[test]
+        fn prepare_wav_files_from_default_yaml() {
+            use crate::books::file::load;
+            use crate::books::spec::Id;
+            use std::env;
+            let mut petrov_book = load("./resources/demo.yaml").unwrap();
+            let missiles_launched_opt = petrov_book.sounds.get_mut(&Id::new("missiles_launched"));
+            match missiles_launched_opt {
+                Some(sound_spec) => {
+                    assert!(sound_spec.speech.is_some());
+                    BookBuilder::prepare_sound(sound_spec, Path::new("/home/krachzack")).unwrap();
+                }
+                _ => panic!("Could not load demo file"),
+            }
+
+            //
+        }
+    }
+}
+
+/// Compiles the phone book into states and sounds.
 ///
-/// The initial state will be at index 0.
-pub fn compile(mut book: Book) -> Result<Vec<State>, Error> {
+/// This also prepares espeak speech into WAV files
+/// in a temporary directory.
+pub fn compile(book: spec::Book) -> Result<Book, Error> {
+    let mut builder = Book::builder()?;
+
+    let spec::Book {
+        states,
+        sounds,
+        initial,
+        mut transitions,
+    } = book;
+
+    let sounds: HashMap<Id, usize> = sounds
+        .into_iter()
+        .enumerate()
+        .map(|(idx, (id, s))| builder.sound(s).map(|_| (id, idx)))
+        .collect::<Result<_, Error>>()?;
+
     let defined_states = {
-        let mut states: Vec<StateId> = book.states.keys().map(Clone::clone).collect();
+        let mut states: Vec<Id> = states.keys().map(Clone::clone).collect();
 
         let initial_idx = states
             .iter()
-            .position(|s| *s == book.initial)
-            .ok_or_else(|| format_err!("Intitial state {:?} is undefined", book.initial))?;
+            .position(|s| *s == initial)
+            .ok_or_else(|| format_err!("Intitial state {:?} is undefined", initial))?;
 
         if initial_idx != 0 {
             states.swap(initial_idx, 0);
@@ -25,15 +163,14 @@ pub fn compile(mut book: Book) -> Result<Vec<State>, Error> {
         states
     };
 
-    let any_transition = book.transitions.remove(&StateId::new("any"));
+    let any_transition = transitions.remove(&Id::new("any"));
     let default_transition = Transitions::default();
-    let default_state = book::State::default();
+    let default_state = spec::State::default();
 
     defined_states
         .iter()
         .map(|id| {
-            let state = book
-                .states
+            let state = states
                 .get(id)
                 // defined_states are from the keys, unwrap of key access is safe
                 .unwrap()
@@ -41,20 +178,25 @@ pub fn compile(mut book: Book) -> Result<Vec<State>, Error> {
                 .unwrap_or(&default_state);
 
             let transitions = with_any(
-                book.transitions.get(id).unwrap_or(&default_transition),
+                transitions.get(id).unwrap_or(&default_transition),
                 any_transition.as_ref().unwrap_or(&default_transition),
             );
 
-            compile_state(&defined_states, id, state, &transitions)
+            let state = compile_state(&defined_states, id, state, &transitions, &sounds)?;
+            builder.state(state);
+            Ok(())
         })
-        .collect()
+        .collect::<Result<Vec<()>, Error>>()?;
+
+    Ok(builder.build())
 }
 
 fn compile_state(
-    defined_states: &[StateId],
-    state_id: &StateId,
-    spec: &book::State,
-    transitions: &Transitions
+    defined_states: &[Id],
+    state_id: &Id,
+    spec: &spec::State,
+    transitions: &Transitions,
+    sounds: &HashMap<Id, usize>,
 ) -> Result<State, Error> {
     let mut state = State::builder()
         .name(if spec.name.is_empty() {
@@ -62,10 +204,25 @@ fn compile_state(
         } else {
             spec.name.clone()
         })
-        .speech(spec.speech.clone())
-        .terminal(spec.terminal)
-        .content_files(spec.content.iter().map(PathBuf::from))
-        .environment_files(spec.content.iter().map(PathBuf::from));
+        .terminal(spec.terminal);
+
+    state = state.sounds(
+        spec.sounds
+            .iter()
+            .map(|id| {
+                if sounds.contains_key(id) {
+                    Ok(sounds[id])
+                } else {
+                    bail!("State {:?} uses undefined Sound ID {:?}", state_id, id)
+                }
+            })
+            .collect::<Result<Vec<usize>, Error>>()?,
+    );
+
+    if !spec.speech.is_empty() {
+        warn!("speech on a state is deprecated and should not be used in new phonebooks. Use a sound instead.");
+        state = state.speech(spec.speech.clone())
+    }
 
     state = compile_ring(state, spec.ring);
 
@@ -111,7 +268,7 @@ fn compile_state(
     Ok(state.build())
 }
 
-fn lookup_state(defined_states: &[StateId], search_id: &StateId) -> Result<usize, Error> {
+fn lookup_state(defined_states: &[Id], search_id: &Id) -> Result<usize, Error> {
     defined_states
         .iter()
         .position(|id| id == search_id)

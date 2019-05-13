@@ -9,6 +9,7 @@ extern crate log;
 extern crate serde;
 extern crate serde_yaml;
 extern crate tavla;
+extern crate tempfile;
 
 mod acts;
 mod books;
@@ -16,11 +17,13 @@ mod err;
 mod phone;
 mod senses;
 mod states;
+mod version;
 
 use crate::acts::Actuators;
+use crate::books::Book;
 use crate::phone::Phone;
 use crate::senses::init_sensors;
-use crate::states::{Machine, State};
+use crate::states::Machine;
 use clap::{crate_authors, crate_name, crate_version, App, Arg};
 use failure::Error;
 use log::{debug, error, info, warn, LevelFilter};
@@ -110,7 +113,7 @@ fn bootstrap() -> Result<(), Error> {
     }
 }
 
-fn launch(states: Vec<State>) -> Result<(), Error> {
+fn launch(book: Book) -> Result<(), Error> {
     let termination_requested = listen_for_termination_signal();
     let phone = Phone::new().ok().map(|p| Arc::new(Mutex::new(p)));
 
@@ -121,8 +124,8 @@ fn launch(states: Vec<State>) -> Result<(), Error> {
     }
 
     let sensors = init_sensors(&phone);
-    let actuators = Actuators::new(&phone);
-    let mut machine = Machine::new(sensors, actuators, states);
+    let actuators = Actuators::new(&phone, book.sounds());
+    let mut machine = Machine::new(sensors, actuators, book.states());
 
     while !termination_requested.load(SeqCst) && machine.update() {
         sleep(Duration::from_millis(10));

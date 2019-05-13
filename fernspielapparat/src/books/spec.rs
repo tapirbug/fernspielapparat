@@ -5,15 +5,15 @@ use std::path::PathBuf;
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Deserialize)]
 #[serde(transparent)]
-pub struct StateId(String);
+pub struct Id(String);
 
-impl StateId {
+impl Id {
     pub fn new<S: Into<String>>(from: S) -> Self {
-        StateId(from.into())
+        Id(from.into())
     }
 }
 
-impl fmt::Display for StateId {
+impl fmt::Display for Id {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -21,10 +21,12 @@ impl fmt::Display for StateId {
 
 #[derive(Deserialize)]
 pub struct Book {
-    pub initial: StateId,
-    pub states: HashMap<StateId, Option<State>>,
+    pub initial: Id,
+    pub states: HashMap<Id, Option<State>>,
     #[serde(default)]
-    pub transitions: HashMap<StateId, Transitions>,
+    pub transitions: HashMap<Id, Transitions>,
+    #[serde(default)]
+    pub sounds: HashMap<Id, Sound>,
 }
 
 #[derive(Deserialize, Default)]
@@ -34,7 +36,6 @@ pub struct State {
     pub name: String,
     #[serde(default)]
     pub speech: String,
-    pub speech_file: Option<PathBuf>,
     #[serde(default)]
     pub lights: Lighting,
     /// Ringing time in seconds
@@ -43,9 +44,29 @@ pub struct State {
     #[serde(default)]
     pub terminal: bool,
     #[serde(default)]
-    pub content: Vec<String>,
+    pub sounds: Vec<Id>,
+}
+
+#[derive(Deserialize, Default)]
+pub struct Sound {
     #[serde(default)]
-    pub environment: Vec<String>,
+    pub speech: Option<String>,
+    #[serde(default)]
+    pub file: PathBuf,
+    #[serde(default)]
+    pub volume: f32,
+    /// When the sound is played again after being
+    /// interrupted, do not start over but play from
+    /// the last playback position minus the specified
+    /// time in seconds.
+    ///
+    /// If the sound was never played before, or if
+    /// it has been played in full the last time,
+    /// the sound will start over.
+    #[serde(default)]
+    pub backoff: Option<f64>,
+    #[serde(default, rename = "loop")]
+    pub looping: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -62,11 +83,11 @@ pub struct Lighting {
 pub struct Transitions {
     /// When input in some format was received.
     #[serde(default)]
-    pub dial: HashMap<String, StateId>,
-    pub pick_up: Option<StateId>,
-    pub hang_up: Option<StateId>,
+    pub dial: HashMap<String, Id>,
+    pub pick_up: Option<Id>,
+    pub hang_up: Option<Id>,
     /// When all actuators are done.
-    pub end: Option<StateId>,
+    pub end: Option<Id>,
     pub timeout: Option<Timeout>,
 }
 
@@ -74,13 +95,14 @@ pub struct Transitions {
 pub struct Timeout {
     /// Time in seconds.
     pub after: f64,
-    pub to: StateId,
+    pub to: Id,
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use serde_yaml::from_str;
+    use tempfile::tempdir;
 
     #[test]
     fn deserialize_example_book() {

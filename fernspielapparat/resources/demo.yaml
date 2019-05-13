@@ -2,17 +2,50 @@ states:
   ring:
     ring: 0.5
   speaking:
+    sounds:
+      - missiles_launched
+  interrupted_speaking:
+    sounds:
+      - interrupted
+  panicking:
+    sounds:
+      - music
+      - still_there
+  interrupted_panicking:
+    sounds:
+      - interrupted
+  continue_panicking:
+    sounds:
+      - music
+    speech: >
+      Lieutenant Petrow? What are your orders? You must decide.
+  interrupted_continue_panicking:
+    sounds:
+      - interrupted
+  hung_up:
+    terminal: true
+
+sounds:
+  music:
+    backoff: 0
+    volume: 0.3
+    loop: true
+    file: test/A Good Bass for Gambling.mp3
+  missiles_launched:
+    backoff: 0.3
     speech: >
       Lieutenant Petrow!
       They have launched the missiles.
       What are your orders?
-  panicking:
-    speech: Are you still there?
-  continue_panicking:
-    speech: Lieutenant Petrow? What are your orders? You must decide.
-  hung_up:
-    terminal: true
-
+  still_there:
+    backoff: 0.3
+    speech: >
+      Are you still there?
+  interrupted:
+    speech: >
+      Why are you dialing numbers at random?
+      This is important, Lieutenant Petrow!
+  
 initial: ring
 
 transitions:
@@ -24,17 +57,58 @@ transitions:
     timeout:
       after: 10.0
       to: panicking
+    dial:
+      0: interrupted_speaking
+      1: interrupted_speaking
+      2: interrupted_speaking
+      3: interrupted_speaking
+      4: interrupted_speaking
+      5: interrupted_speaking
+      6: interrupted_speaking
+      7: interrupted_speaking
+      8: interrupted_speaking
+      9: interrupted_speaking
   panicking:
     end: continue_panicking
+    dial:
+      0: interrupted_panicking
+      1: interrupted_panicking
+      2: interrupted_panicking
+      3: interrupted_panicking
+      4: interrupted_panicking
+      5: interrupted_panicking
+      6: interrupted_panicking
+      7: interrupted_panicking
+      8: interrupted_panicking
+      9: interrupted_panicking
   continue_panicking:
     timeout:
       after: 15.0
       to: continue_panicking
+    dial:
+      0: interrupted_continue_panicking
+      1: interrupted_continue_panicking
+      2: interrupted_continue_panicking
+      3: interrupted_continue_panicking
+      4: interrupted_continue_panicking
+      5: interrupted_continue_panicking
+      6: interrupted_continue_panicking
+      7: interrupted_continue_panicking
+      8: interrupted_continue_panicking
+      9: interrupted_continue_panicking
   hung_up:
     timeout:
       after: 60.0
       to: ring
+  interrupted_speaking:
+    end: speaking
+  interrupted_panicking:
+    end: panicking
+  interrupted_continue_panicking:
+    end: continue_panicking
   any:
     pick_up: speaking
     hang_up: hung_up
+    
+
     

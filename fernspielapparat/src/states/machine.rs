@@ -5,10 +5,10 @@ use log::debug;
 use std::time::Instant;
 
 /// A state machine modelled after a mealy machine.
-pub struct Machine {
+pub struct Machine<'a> {
     sensors: Sensors,
     actuators: Actuators,
-    states: Vec<State>,
+    states: &'a [State],
     current_state_idx: usize,
     /// The time of the last transition and initially the startup time.
     last_enter_time: Instant,
@@ -17,8 +17,8 @@ pub struct Machine {
     current_actuators_done_time: Option<Instant>,
 }
 
-impl Machine {
-    pub fn new(sensors: Sensors, actuators: Actuators, states: Vec<State>) -> Self {
+impl<'a> Machine<'a> {
+    pub fn new(sensors: Sensors, actuators: Actuators, states: &'a [State]) -> Self {
         assert!(!states.is_empty(), "Expected at least one state");
 
         let now = Instant::now();
@@ -142,7 +142,7 @@ mod test {
     #[test]
     #[should_panic]
     fn machine_without_states() {
-        Machine::new(Sensors::builder().build(), Actuators::new(&None), vec![]);
+        Machine::new(Sensors::builder().build(), Actuators::new(&None, &[]), &[]);
     }
 
     #[test]
@@ -150,8 +150,8 @@ mod test {
     fn out_of_bounds_end_transition_target() {
         Machine::new(
             Sensors::builder().build(),
-            Actuators::new(&None),
-            vec![State::builder()
+            Actuators::new(&None, &[]),
+            &[State::builder()
                 .name("with illegal end transition target")
                 .end(1)
                 .build()],
@@ -165,7 +165,7 @@ mod test {
         let timeout = Duration::from_millis(350);
         let expected_duration = ring_time + timeout;
 
-        let states = vec![
+        let states = &[
             State::builder()
                 .name("ringing")
                 .ring_for(ring_time)
@@ -194,7 +194,7 @@ mod test {
 
         dbg!(speech_time);
 
-        let test_duration = time_until_done_when_no_input(vec![
+        let test_duration = time_until_done_when_no_input(&[
             State::builder()
                 .name("speaking")
                 .speech(text)
@@ -227,10 +227,14 @@ mod test {
         speech_start.elapsed()
     }
 
-    fn time_until_done_when_no_input(states: Vec<State>) -> Duration {
+    fn time_until_done_when_no_input(states: &[State]) -> Duration {
         let test_start = Instant::now();
 
-        let mut machine = Machine::new(Sensors::builder().build(), Actuators::new(&None), states);
+        let mut machine = Machine::new(
+            Sensors::builder().build(),
+            Actuators::new(&None, &[]),
+            states,
+        );
 
         while machine.update() {
             yield_now()
