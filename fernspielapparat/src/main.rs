@@ -1,3 +1,4 @@
+extern crate base64;
 extern crate clap;
 extern crate crossbeam_channel;
 extern crate ctrlc;
@@ -18,7 +19,6 @@ mod err;
 mod phone;
 mod senses;
 mod states;
-mod version;
 
 use crate::acts::Actuators;
 use crate::books::Book;

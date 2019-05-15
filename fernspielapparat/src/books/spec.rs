@@ -1,7 +1,6 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fmt;
-use std::path::PathBuf;
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Deserialize)]
 #[serde(transparent)]
@@ -52,7 +51,7 @@ pub struct Sound {
     #[serde(default)]
     pub speech: Option<String>,
     #[serde(default)]
-    pub file: PathBuf,
+    pub file: String,
     #[serde(default)]
     pub volume: f32,
     /// When the sound is played again after being

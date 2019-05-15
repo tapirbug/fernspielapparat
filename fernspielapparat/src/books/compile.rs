@@ -12,11 +12,14 @@ mod book {
     use crate::acts::SoundSpec;
     use crate::books::spec;
     use crate::states::State;
-    use failure::Error;
+    use failure::{Error, format_err};
     use log::debug;
     use std::path::{Path, PathBuf};
     use tavla::{any_voice, Speech, Voice};
     use tempfile::{tempdir, TempDir};
+    use std::fs::write;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hasher;
 
     pub struct Book {
         pub(crate) states: Vec<State>,
@@ -63,9 +66,6 @@ mod book {
         /// The content file is then set to the given spec and its
         /// speech text is removed.spec
         fn prepare_sound(sound: &mut spec::Sound, cache_directory: &Path) -> Result<(), Error> {
-            use std::collections::hash_map::DefaultHasher;
-            use std::hash::Hasher;
-
             if let Some(text) = sound.speech.take() {
                 let mut hash = DefaultHasher::new();
                 hash.write(text.as_bytes());
@@ -78,10 +78,47 @@ mod book {
                 let voice = any_voice()?;
                 voice.speak_to_file(text, &filename)?.await_done()?;
 
-                sound.file = filename;
+                sound.file = filename.to_str().unwrap().into();
             }
 
+            match Self::prepare_data_uri(&sound.file, cache_directory) {
+                Ok(Some(persisted_data_uri_path)) => sound.file = persisted_data_uri_path.to_str().unwrap().into(),
+                Ok(None) => (),
+                Err(e) => return Err(From::from(e))
+            };
+
             Ok(())
+        }
+
+        fn prepare_data_uri(potential_data_uri: &str, cache_directory: &Path) -> Result<Option<PathBuf>, Error> {
+            use base64::decode;
+
+            if potential_data_uri.starts_with("data:") {
+                let rest = &potential_data_uri["data:".len()..];
+                let mime_end = rest[0..rest.len().min(32)].find(";base64,").ok_or_else(|| format_err!("Data uri was not base64"))?;
+                let mime = &rest[0..mime_end];
+                let content = decode(&rest[(mime_end + ";base64,".len())..].trim())?;
+
+                let mut hash = DefaultHasher::new();
+                hash.write(&content);
+                let extension = match mime {
+                    "audio/mpeg" 
+                    | "audio/mp3" 
+                    | "audio/mpeg3" 
+                    | "audio/x-mpeg-3" 
+                    | "video/mpeg" 
+                    | "video/x-mpeg" => "mp3",
+                    _ => "wav"
+                };
+                let mut path = PathBuf::from(cache_directory);
+                path.push(format!("{name}.{extension}", name=hash.finish(), extension=extension));
+                debug!("Writing base64 encoded {:?}", path);
+
+                write(&path, &content)?;
+                Ok(Some(path))
+            } else {
+                Ok(None)
+            }
         }
 
         pub fn sound(&mut self, mut sound: spec::Sound) -> Result<&mut Self, Error> {

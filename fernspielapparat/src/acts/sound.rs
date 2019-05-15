@@ -156,7 +156,6 @@ mod test {
 
 mod play {
     use failure::{bail, format_err, Error};
-    use log::debug;
     use std::cmp;
     use std::convert::TryInto;
     use std::path::Path;
@@ -195,14 +194,7 @@ mod play {
             media.event_manager().attach(vlc::EventType::MediaDurationChanged, move |e, _| {
                 match e {
                     vlc::Event::MediaDurationChanged(duration) => {
-                        let sent = tx.send(Duration::from_millis(duration.try_into().unwrap_or(0)));
-                        match sent {
-                            Ok(_) => (),
-                            Err(e) => {
-                                // No detach method, later invocations can err, no problem
-                                debug!("Reading duration took longer than {:?} and hit a timeout, but was eventually detected ({:?}), error: {}", READ_DURATION_TIMEOUT, duration, e)
-                            }
-                        }
+                        tx.send(Duration::from_millis(duration.try_into().unwrap_or(0))).ok();
                     },
                     _ => (),
                 }
@@ -285,27 +277,11 @@ mod play {
         }
     }
 
-    fn fmt_seconds(duration: &Duration) -> String {
-        format!(
-            "{secs}.{millis:03}",
-            secs = duration.as_secs(),
-            millis = duration.as_millis() % 1000
-        )
-    }
-
     #[cfg(test)]
     mod test {
         use super::*;
         use std::thread::sleep;
         use std::time::{Duration, Instant};
-
-        #[test]
-        fn fortytwo_point_041() {
-            assert_eq!(
-                fmt_seconds(&Duration::from_millis(42_041)),
-                String::from("42.041")
-            )
-        }
 
         #[test]
         fn elevator_music() {
