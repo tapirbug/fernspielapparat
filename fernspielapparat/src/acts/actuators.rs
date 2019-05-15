@@ -99,7 +99,7 @@ impl Actuators {
                 // Only add a new sound if not already there (background music)
                 if sound_opt.is_none() {
                     debug!("Starting sound: {:?}", self.sound_specs[idx].source());
-                    *sound_opt = Some(Sound::from_spec(&self.sound_specs[idx]))
+                    *sound_opt = Sound::from_spec(&self.sound_specs[idx]).ok();
                 }
             }
         }

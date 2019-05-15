@@ -102,7 +102,6 @@ pub struct Timeout {
 mod test {
     use super::*;
     use serde_yaml::from_str;
-    use tempfile::tempdir;
 
     #[test]
     fn deserialize_example_book() {

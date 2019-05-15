@@ -112,7 +112,6 @@ mod book {
         fn prepare_wav_files_from_default_yaml() {
             use crate::books::file::load;
             use crate::books::spec::Id;
-            use std::env;
             let mut petrov_book = load("./resources/demo.yaml").unwrap();
             let missiles_launched_opt = petrov_book.sounds.get_mut(&Id::new("missiles_launched"));
             match missiles_launched_opt {

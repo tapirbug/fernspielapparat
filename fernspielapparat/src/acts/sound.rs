@@ -1,18 +1,16 @@
 use crate::acts::Act;
 use derivative::Derivative;
 use failure::Error;
-use log::warn;
-use play::play;
+use play::Player;
 use std::path::{Path, PathBuf};
-use std::process::Child;
 use std::time::Duration;
 
 /// Plays a sound file in the background.
 #[derive(Derivative)]
 #[derivative(PartialEq, Eq, Hash, Debug)]
 pub struct Sound {
-    #[derivative(Hash = "ignore", PartialEq = "ignore")]
-    child: Option<Child>,
+    #[derivative(Hash = "ignore", PartialEq = "ignore", Debug = "ignore")]
+    player: Player,
     spec: SoundSpec,
 }
 
@@ -44,6 +42,11 @@ impl SoundSpec {
         )
     }
 
+    #[cfg(test)]
+    pub fn seek_then_repeat<P: AsRef<Path>>(source: P, start_offset: Duration) -> Self {
+        Self::new(source.as_ref().into(), EndBehavior::Loop, start_offset)
+    }
+
     pub fn source(&self) -> &Path {
         &self.source
     }
@@ -64,79 +67,222 @@ enum EndBehavior {
 }
 
 impl Sound {
-    pub fn from_spec(spec: &SoundSpec) -> Self {
-        Self {
-            child: play(spec)
-                .map_err(|e| warn!("Could not play file {:?}, error: {}", &spec.source, e))
-                .ok(),
+    pub fn from_spec(spec: &SoundSpec) -> Result<Self, Error> {
+        let mut player = Player::new(spec.source())?;
+        player.play()?;
+        player.seek(spec.start_offset);
+        assert!(
+            player.played() >= spec.start_offset,
+            "{:?}",
+            player.played()
+        );
+
+        let sound = Self {
+            player,
             spec: spec.clone(),
-        }
+        };
+
+        Ok(sound)
+    }
+
+    pub fn rewind(&mut self) {
+        self.player.seek(Duration::from_millis(0));
     }
 }
 
 impl Act for Sound {
     fn update(&mut self) -> Result<(), Error> {
-        if let Some(child) = self.child.as_mut() {
-            let done = child.try_wait().map(|status| status.is_some())?;
-
-            if done {
-                self.child.take();
-            }
+        if self.spec.is_loop() && !self.player.playing() {
+            self.rewind();
+            self.player.play()?;
         }
+
         Ok(())
     }
 
     fn done(&self) -> Result<bool, Error> {
-        Ok(self.child.is_none())
+        Ok(!self.player.playing())
     }
 
     fn cancel(&mut self) -> Result<(), Error> {
-        self.child.take().as_mut().map(Child::kill);
+        self.player.pause()
+    }
+}
 
-        Ok(())
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::time::Instant;
+
+    use std::thread::sleep;
+    #[test]
+    fn once_with_offset() {
+        let mut sound = Sound::from_spec(&SoundSpec::once(
+            "test/A Good Bass for Gambling.mp3",
+            Duration::from_secs(2 * 60 + 34), // Start almost at the end
+        ))
+        .unwrap();
+
+        sound.update().unwrap();
+        assert!(!sound.done().unwrap());
+        let play_start_time = Instant::now();
+        while !sound.done().unwrap() {
+            sleep(Duration::from_secs(1));
+            sound.update().unwrap();
+        }
+        assert!(play_start_time.elapsed() < Duration::from_secs(5));
+        assert!(play_start_time.elapsed() > Duration::from_millis(50))
+    }
+
+    #[test]
+    fn elevator_music_loop_then_cancel() {
+        let mut sound = Sound::from_spec(&SoundSpec::seek_then_repeat(
+            "test/A Good Bass for Gambling.mp3",
+            Duration::from_secs(2 * 60 + 30),
+        ))
+        .expect("Could not make sound");
+
+        sound.update().unwrap();
+        assert!(!sound.done().unwrap());
+        sleep(Duration::from_millis(4_000));
+        sound.update().unwrap();
+        assert!(!sound.done().unwrap());
+
+        sound.cancel().unwrap();
+
+        assert!(sound.done().unwrap());
     }
 }
 
 mod play {
-    use super::{EndBehavior::Done, EndBehavior::Loop, SoundSpec};
-    use crate::version::detect_version;
-    use failure::{format_err, Error};
+    use failure::{bail, format_err, Error};
     use log::debug;
-    use std::process::{Child, Command};
+    use std::cmp;
+    use std::convert::TryInto;
+    use std::path::Path;
+    use std::sync::mpsc::channel;
     use std::time::Duration;
+    use std::time::Instant;
+    use vlc::{self, Instance, Media, MediaPlayer, State};
 
-    pub fn play(spec: &SoundSpec) -> Result<Child, Error> {
-        detect_version("cvlc")?;
+    const READ_DURATION_TIMEOUT: Duration = Duration::from_secs(4);
+    const PAUSE_DIRTY_TIMEOUT: Duration = Duration::from_millis(50);
 
-        let mut cmd = Command::new("cvlc");
-        cmd.arg("--no-one-instance");
+    pub struct Player {
+        #[allow(dead_code)]
+        instance: Instance,
+        media: Media,
+        player: MediaPlayer,
+        duration: Duration,
+        /// There is some lag between pausing the player and when its state
+        /// has changed to paused. We keep track ourselves of whether or not
+        /// the player is paused and use the real media state after some timeout
+        /// `PAUSE_DIRTY_TIMEOUT`.
+        last_pause_request: Option<(Instant, bool)>,
+    }
 
-        if let Done = spec.end {
-            cmd.arg("--play-and-exit");
+    impl Player {
+        pub fn new(file: impl AsRef<Path>) -> Result<Self, Error> {
+            let instance = Instance::new().ok_or_else(|| format_err!("Could not load libvlc"))?;
+
+            let media = Media::new_path(&instance, file.as_ref())
+                .ok_or_else(|| format_err!("Could not load media {:?}", file.as_ref()))?;
+
+            let player = MediaPlayer::new(&instance)
+                .ok_or_else(|| format_err!("Could not load media {:?}", file.as_ref()))?;
+
+            let (tx, rx) = channel::<Duration>();
+            media.event_manager().attach(vlc::EventType::MediaDurationChanged, move |e, _| {
+                match e {
+                    vlc::Event::MediaDurationChanged(duration) => {
+                        let sent = tx.send(Duration::from_millis(duration.try_into().unwrap_or(0)));
+                        match sent {
+                            Ok(_) => (),
+                            Err(e) => {
+                                // No detach method, later invocations can err, no problem
+                                debug!("Reading duration took longer than {:?} and hit a timeout, but was eventually detected ({:?}), error: {}", READ_DURATION_TIMEOUT, duration, e)
+                            }
+                        }
+                    },
+                    _ => (),
+                }
+            }).map_err(|_| format_err!("Could not obtain media duration: {:?}", file.as_ref()))?;
+
+            media.parse();
+            player.set_media(&media);
+
+            let duration = rx
+                .recv_timeout(READ_DURATION_TIMEOUT)
+                .map_err(|_| format_err!("Could not obtain media duration: {:?}", file.as_ref()))?;
+
+            Ok(Player {
+                instance,
+                media,
+                player,
+                duration,
+                last_pause_request: None,
+            })
         }
 
-        let is_loop = match spec.end {
-            Loop => true,
-            _ => false,
-        };
-        let has_offset = spec.start_offset != Duration::from_millis(0);
-        if is_loop && has_offset {
-            cmd.arg(&spec.source);
-            cmd.arg(&format!(":start-time={}", fmt_seconds(&spec.start_offset)));
-            cmd.arg(":no-loop");
-            cmd.arg("--start-time=0");
-        } else if is_loop {
-            cmd.arg("--loop");
-        } else if has_offset {
-            cmd.arg(&format!("--start-time={}", fmt_seconds(&spec.start_offset)));
+        pub fn play(&mut self) -> Result<(), Error> {
+            self.player.play().map_err(|_| {
+                format_err!(
+                    "Could not play media {:?}",
+                    self.media.mrl().unwrap_or("<Could not obtain mrl>".into())
+                )
+            })?;
+            self.last_pause_request = Some((Instant::now(), false));
+
+            Ok(())
         }
 
-        cmd.arg(&spec.source);
+        pub fn pause(&mut self) -> Result<(), Error> {
+            if !self.player.can_pause() {
+                bail!(
+                    "Could not pause media {:?}",
+                    self.media.mrl().unwrap_or("<Could not obtain mrl>".into())
+                );
+            }
 
-        debug!("Starting sound: {:?}", &cmd);
+            self.player.set_pause(true);
+            self.last_pause_request = Some((Instant::now(), true));
 
-        cmd.spawn()
-            .map_err(|e| format_err!("Could not play audio file {:?}, error: {}", &spec.source, e))
+            // note: this does not hold right away, VLC needs some time
+            // assert_eq!(self.player.state(), State::Paused);
+
+            Ok(())
+        }
+
+        pub fn playing(&self) -> bool {
+            match self.last_pause_request {
+                Some((at, paused)) if at.elapsed() < PAUSE_DIRTY_TIMEOUT => !paused,
+                _ => match self.player.state() {
+                    State::NothingSpecial | State::Opening | State::Buffering | State::Playing => {
+                        true
+                    }
+                    State::Paused | State::Stopped | State::Ended | State::Error => false,
+                },
+            }
+        }
+
+        pub fn played(&self) -> Duration {
+            Duration::from_millis(self.player.get_time().unwrap_or(0).try_into().unwrap_or(0))
+        }
+
+        /// Full duration of the played media.
+        pub fn duration(&self) -> Duration {
+            self.duration
+        }
+
+        pub fn seek(&mut self, from_start: Duration) {
+            let from_start = cmp::min(self.duration(), from_start); // Skip to end if out of bounds
+            self.player.set_time(
+                from_start
+                    .as_millis()
+                    .try_into()
+                    .expect("Duration was out of bounds"),
+            );
+        }
     }
 
     fn fmt_seconds(duration: &Duration) -> String {
@@ -151,36 +297,7 @@ mod play {
     mod test {
         use super::*;
         use std::thread::sleep;
-
-        #[ignore]
-        #[test]
-        fn elevator_music() {
-            let status = play(&SoundSpec {
-                source: "test/A Good Bass for Gambling.mp3".into(),
-                end: Done,
-                start_offset: Duration::from_secs(2 * 60 + 30),
-            })
-            .expect("Could not play")
-            .wait()
-            .expect("Could not wait for end of music");
-
-            assert!(status.success());
-        }
-
-        #[ignore]
-        #[test]
-        fn elevator_music_loop_then_stop() {
-            let mut child = play(&SoundSpec {
-                source: "test/A Good Bass for Gambling.mp3".into(),
-                end: Loop,
-                start_offset: Duration::from_secs(2 * 60 + 30),
-            })
-            .expect("Could not play");
-
-            sleep(Duration::from_millis(10_000));
-
-            child.kill().expect("Could not kill vlc");
-        }
+        use std::time::{Duration, Instant};
 
         #[test]
         fn fortytwo_point_041() {
@@ -190,10 +307,35 @@ mod play {
             )
         }
 
-    }
-}
+        #[test]
+        fn elevator_music() {
+            let mut player =
+                Player::new("test/A Good Bass for Gambling.mp3").expect("Could not make player");
+            let play_start_time = Instant::now();
+            player.play().expect("Could not play");
+            assert!(player.playing());
 
-#[cfg(test)]
-mod test {
-    use super::*;
+            while player.playing() && play_start_time.elapsed() < Duration::from_secs(1) {
+                sleep(Duration::from_secs(1))
+            }
+            assert!(play_start_time.elapsed() > Duration::from_secs(1));
+
+            player.pause().unwrap();
+            assert!(!player.playing());
+            sleep(Duration::from_millis(500));
+
+            player.play().unwrap();
+            assert!(player.playing());
+            sleep(PAUSE_DIRTY_TIMEOUT);
+            assert!(player.playing());
+
+            player.seek(player.duration() - Duration::from_millis(10));
+            assert!(player.played() > Duration::from_secs(100));
+            sleep(Duration::from_millis(15));
+            assert!(
+                !player.playing(),
+                "Player should be paused after reaching the end of the media"
+            );
+        }
+    }
 }

@@ -10,6 +10,7 @@ extern crate serde;
 extern crate serde_yaml;
 extern crate tavla;
 extern crate tempfile;
+extern crate vlc;
 
 mod acts;
 mod books;
