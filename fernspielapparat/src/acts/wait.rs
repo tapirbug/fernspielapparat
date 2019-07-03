@@ -20,6 +20,10 @@ impl Wait {
 }
 
 impl Act for Wait {
+    fn activate(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
     fn update(&mut self) -> Result<(), Error> {
         if !self.done && self.start.elapsed().gt(&self.duration) {
             self.done = true;

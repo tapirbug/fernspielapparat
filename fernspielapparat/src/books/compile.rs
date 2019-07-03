@@ -13,13 +13,15 @@ mod book {
     use crate::books::spec;
     use crate::states::State;
     use failure::{Error, format_err};
-    use log::debug;
+    use log::{warn, debug};
     use std::path::{Path, PathBuf};
     use tavla::{any_voice, Speech, Voice};
     use tempfile::{tempdir, TempDir};
     use std::fs::write;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::Hasher;
+
+    const KIB : usize = 1024;
 
     pub struct Book {
         pub(crate) states: Vec<State>,
@@ -54,6 +56,9 @@ mod book {
     }
 
     impl BookBuilder {
+        /// No more than 256KiB of text are allowed for synthesis.
+        const MAX_TEXT_LEN : usize = 256 * KIB;
+
         pub fn state(&mut self, state: State) -> &mut Self {
             self.book.states.push(state);
             self
@@ -66,14 +71,18 @@ mod book {
         /// The content file is then set to the given spec and its
         /// speech text is removed.spec
         fn prepare_sound(sound: &mut spec::Sound, cache_directory: &Path) -> Result<(), Error> {
-            if let Some(text) = sound.speech.take() {
+            if let Some(mut text) = sound.speech.take() {
+                if text.len() > Self::MAX_TEXT_LEN {
+                    shrink_to_max(&mut text, Self::MAX_TEXT_LEN);
+                }
+
                 let mut hash = DefaultHasher::new();
                 hash.write(text.as_bytes());
 
                 let mut filename = PathBuf::from(cache_directory);
                 filename.push(format!("{}.wav", hash.finish()));
 
-                debug!("Preparing {:?}...", &filename);
+                debug!("Preparing speech {:?}...", &filename);
                 debug!("Text: {:?}", text);
                 let voice = any_voice()?;
                 voice.speak_to_file(text, &filename)?.await_done()?;
@@ -138,6 +147,32 @@ mod book {
 
         pub fn build(self) -> Book {
             self.book
+        }
+    }
+
+    fn shrink_to_max(text: &mut String, max: usize) {
+        warn!(
+            "Sound text has a size of {actual}KiB, \
+                which exceeds the maximum of {max}KiB \
+                by {excess}KiB. \
+                Text is cut off after the maximum size.",
+            actual = text.len() / KIB,
+            max = max / KIB,
+            excess = (text.len() - max) / KIB
+        );
+        text.replace_range(
+            next_char_boundary(&text, max)..,
+            ""
+        );
+    }
+
+    fn next_char_boundary(string: &str, search_start: usize) -> usize {
+        if search_start >= string.len() {
+            string.len()
+        } else {
+            (search_start..string.len())
+                .find(|i| string.is_char_boundary(*i))
+                .unwrap_or(string.len())
         }
     }
 

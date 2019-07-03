@@ -1,14 +1,12 @@
 use failure::Error;
 
 pub trait Act {
+    /// Activate or re-activate the act, making it
+    /// ready to be updated.
+    fn activate(&mut self) -> Result<(), Error>;
+
     /// Performs per-cycle updates to the act.
     fn update(&mut self) -> Result<(), Error>;
-
-    /// Tries to check if the act has either completed
-    /// or been cancelled.
-    ///
-    /// Returns an error only if the check failed.
-    fn done(&self) -> Result<bool, Error>;
 
     /// Tries to cancel the act, if still running.
     ///
@@ -17,4 +15,10 @@ pub trait Act {
     /// returns `Ok(())`. Returns an error only if
     /// cancellation failed.
     fn cancel(&mut self) -> Result<(), Error>;
+
+    /// Tries to check if the act has either completed
+    /// or been cancelled.
+    ///
+    /// Returns an error only if the check failed.
+    fn done(&self) -> Result<bool, Error>;
 }

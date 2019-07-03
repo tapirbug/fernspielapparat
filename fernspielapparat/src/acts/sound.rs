@@ -1,6 +1,6 @@
 use crate::acts::Act;
 use derivative::Derivative;
-use failure::Error;
+use failure::{Error, bail};
 use play::Player;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -68,14 +68,7 @@ enum EndBehavior {
 
 impl Sound {
     pub fn from_spec(spec: &SoundSpec) -> Result<Self, Error> {
-        let mut player = Player::new(spec.source())?;
-        player.play()?;
-        player.seek(spec.start_offset);
-        assert!(
-            player.played() >= spec.start_offset,
-            "{:?}",
-            player.played()
-        );
+        let player = Player::new(spec.source())?;
 
         let sound = Self {
             player,
@@ -91,6 +84,17 @@ impl Sound {
 }
 
 impl Act for Sound {
+    fn activate(&mut self) -> Result<(), Error> {
+        self.player.play()?;
+        self.player.seek(self.spec.start_offset);
+
+        if self.player.played() >= self.spec.start_offset {
+            Ok(())
+        } else {
+            bail!("Failed to seek to: {:?}", self.spec.start_offset)
+        }
+    }
+
     fn update(&mut self) -> Result<(), Error> {
         if self.spec.is_loop() && !self.player.playing() {
             self.rewind();
@@ -123,6 +127,7 @@ mod test {
         ))
         .unwrap();
 
+        sound.activate().unwrap();
         sound.update().unwrap();
         assert!(!sound.done().unwrap());
         let play_start_time = Instant::now();
@@ -142,6 +147,7 @@ mod test {
         ))
         .expect("Could not make sound");
 
+        sound.activate().unwrap();
         sound.update().unwrap();
         assert!(!sound.done().unwrap());
         sleep(Duration::from_millis(4_000));
@@ -168,8 +174,7 @@ mod play {
     const PAUSE_DIRTY_TIMEOUT: Duration = Duration::from_millis(50);
 
     pub struct Player {
-        #[allow(dead_code)]
-        instance: Instance,
+        _instance: Instance,
         media: Media,
         player: MediaPlayer,
         duration: Duration,
@@ -208,7 +213,7 @@ mod play {
                 .map_err(|_| format_err!("Could not obtain media duration: {:?}", file.as_ref()))?;
 
             Ok(Player {
-                instance,
+                _instance: instance,
                 media,
                 player,
                 duration,

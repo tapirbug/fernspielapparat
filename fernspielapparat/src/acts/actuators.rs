@@ -99,7 +99,14 @@ impl Actuators {
                 // Only add a new sound if not already there (background music)
                 if sound_opt.is_none() {
                     debug!("Starting sound: {:?}", self.sound_specs[idx].source());
-                    *sound_opt = Sound::from_spec(&self.sound_specs[idx]).ok();
+
+                    let new_sound = Sound::from_spec(&self.sound_specs[idx])
+                        .and_then(|mut s| s.activate().map(|_| s));
+
+                    match new_sound {
+                        Ok(sound) => *sound_opt = Some(sound),
+                        Err(err) => warn!("Failed to activate sound: {}", err)
+                    }
                 }
             }
         }

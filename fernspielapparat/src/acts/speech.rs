@@ -5,6 +5,10 @@ use tavla::Speech;
 /// Speech errors are `Fail`, we can convert them
 /// to failure errors.
 impl<T: Speech> Act for T {
+    fn activate(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+    
     fn update(&mut self) -> Result<(), Error> {
         Ok(())
     }
