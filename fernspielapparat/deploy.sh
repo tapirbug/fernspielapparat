@@ -2,8 +2,8 @@
 # Builds and deploys the runtime to Raspberry Pi 2
 
 # RPi2-compatible ARM
-RPI_USER="tom"
-RPI_HOSTNAME="phantom.local"
+RPI_USER="pi"
+RPI_HOSTNAME="rudi.local"
 RPI_DIR="~"
 SSH_HOST="$RPI_USER@$RPI_HOSTNAME"
 SCP_DEST="$SSH_HOST:$RPI_DIR"

@@ -5,5 +5,6 @@ linker = "arm-linux-gnueabihf-gcc"
 ar = "arm-linux-gnueabihf-ar"
 rustflags = [
     "--verbose",
-    #"-L", "native=/usr/arm-linux-gnueabihf/lib"
+    "-C", "link-args=-Wl,-rpath,/home/krachzack/Development/fernspielapparat/fernspielapparat/vendor/lib",
+    "-L", "native=/home/krachzack/Development/fernspielapparat/fernspielapparat/vendor/lib"
 ]
