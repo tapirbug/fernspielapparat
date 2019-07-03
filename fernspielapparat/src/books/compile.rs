@@ -12,7 +12,7 @@ mod book {
     use crate::acts::SoundSpec;
     use crate::books::spec;
     use crate::states::State;
-    use failure::{Error, format_err};
+    use failure::{Error, format_err, bail};
     use log::{warn, debug};
     use std::path::{Path, PathBuf};
     use tavla::{any_voice, Speech, Voice};
@@ -136,11 +136,27 @@ mod book {
             let cache_directory: &Path = self.book.compiled_speech_dir.as_ref();
             Self::prepare_sound(&mut sound, cache_directory)?;
             let path = sound.file.clone();
-            let offset = Duration::from_millis(0);
-            self.book.sounds.push(if sound.looping {
-                SoundSpec::repeat(path)
+
+            let offset = sound.start_offset.unwrap_or(0.0);
+            let offset = if offset < 0.0 {
+                bail!("Encountered negative start offset: {}. \
+                       Positive was expected.", offset)
             } else {
-                SoundSpec::once(path, offset)
+                Duration::from_millis((offset * 1000.0) as u64)
+            };
+
+            let backoff = sound.backoff.unwrap_or(0.0);
+            let backoff = if backoff < 0.0 {
+                bail!("Encountered negative backoff: {}. \
+                       Positive was expected.", backoff)
+            } else {
+                Duration::from_millis((backoff * 1000.0) as u64)
+            };
+
+            self.book.sounds.push(if sound.looping {
+                SoundSpec::repeat(path, offset, backoff)
+            } else {
+                SoundSpec::once(path, offset, backoff)
             });
             Ok(self)
         }

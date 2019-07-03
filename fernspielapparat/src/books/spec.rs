@@ -66,6 +66,8 @@ pub struct Sound {
     pub backoff: Option<f64>,
     #[serde(default, rename = "loop")]
     pub looping: bool,
+    /// Offset on first playback in seconds.
+    pub start_offset: Option<f64>
 }
 
 #[derive(Deserialize, Default)]

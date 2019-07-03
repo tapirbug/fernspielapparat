@@ -19,32 +19,35 @@ pub struct SoundSpec {
     source: PathBuf,
     end: EndBehavior,
     start_offset: Duration,
+    backoff: Duration
 }
 
 impl SoundSpec {
-    fn new(source: PathBuf, end: EndBehavior, start_offset: Duration) -> Self {
+    fn new(source: PathBuf, end: EndBehavior, start_offset: Duration, backoff: Duration) -> Self {
         SoundSpec {
             source,
             end,
             start_offset,
+            backoff
         }
     }
 
-    pub fn once<P: AsRef<Path>>(source: P, start_offset: Duration) -> Self {
-        Self::new(source.as_ref().into(), EndBehavior::Done, start_offset)
+    pub fn once<P: AsRef<Path>>(source: P, start_offset: Duration, backoff: Duration) -> Self {
+        Self::new(source.as_ref().into(), EndBehavior::Done, start_offset, backoff)
     }
 
-    pub fn repeat<P: AsRef<Path>>(source: P) -> Self {
+    pub fn repeat<P: AsRef<Path>>(source: P, start_offset: Duration, backoff: Duration) -> Self {
         Self::new(
             source.as_ref().into(),
             EndBehavior::Loop,
-            Duration::from_millis(0),
+            start_offset,
+            backoff
         )
     }
 
     #[cfg(test)]
     pub fn seek_then_repeat<P: AsRef<Path>>(source: P, start_offset: Duration) -> Self {
-        Self::new(source.as_ref().into(), EndBehavior::Loop, start_offset)
+        Self::new(source.as_ref().into(), EndBehavior::Loop, start_offset, Duration::from_millis(0))
     }
 
     pub fn source(&self) -> &Path {
@@ -124,6 +127,7 @@ mod test {
         let mut sound = Sound::from_spec(&SoundSpec::once(
             "test/A Good Bass for Gambling.mp3",
             Duration::from_secs(2 * 60 + 34), // Start almost at the end
+            Duration::from_millis(0), // No backoff
         ))
         .unwrap();
 
@@ -143,7 +147,7 @@ mod test {
     fn elevator_music_loop_then_cancel() {
         let mut sound = Sound::from_spec(&SoundSpec::seek_then_repeat(
             "test/A Good Bass for Gambling.mp3",
-            Duration::from_secs(2 * 60 + 30),
+            Duration::from_secs(2 * 60 + 30)
         ))
         .expect("Could not make sound");
 
