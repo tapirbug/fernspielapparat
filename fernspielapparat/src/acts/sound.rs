@@ -4,6 +4,7 @@ use failure::{Error, bail};
 use play::Player;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use log::debug;
 
 /// Plays a sound file in the background.
 #[derive(Derivative)]
@@ -12,6 +13,10 @@ pub struct Sound {
     #[derivative(Hash = "ignore", PartialEq = "ignore", Debug = "ignore")]
     player: Player,
     spec: SoundSpec,
+    /// If `true`, the last interaction with the sound from client code
+    /// was `activate`, otherwise `cancel`. If neither has been called,
+    /// is `false`.
+    activated: bool,
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
@@ -76,18 +81,37 @@ impl Sound {
         let sound = Self {
             player,
             spec: spec.clone(),
+            activated: false,
         };
 
         Ok(sound)
     }
 
-    pub fn rewind(&mut self) {
+    fn rewind(&mut self) {
         self.player.seek(Duration::from_millis(0));
+    }
+
+    fn ensure_loop_if_active(&mut self) -> Result<(), Error> {
+        if self.activated && self.spec.is_loop() && !self.player.playing() {
+            self.rewind();
+            self.player.play()?;
+        }
+        Ok(())
+    }
+
+    fn rewind_unless_already_active(&mut self) {
+        if !self.activated {
+            debug!("Rewinding sound on re-enter: {:?}", &self.spec);
+            self.rewind()
+        }
     }
 }
 
 impl Act for Sound {
     fn activate(&mut self) -> Result<(), Error> {
+        self.rewind_unless_already_active();
+
+        self.activated = true;
         self.player.play()?;
         self.player.seek(self.spec.start_offset);
 
@@ -99,12 +123,7 @@ impl Act for Sound {
     }
 
     fn update(&mut self) -> Result<(), Error> {
-        if self.spec.is_loop() && !self.player.playing() {
-            self.rewind();
-            self.player.play()?;
-        }
-
-        Ok(())
+        self.ensure_loop_if_active()
     }
 
     fn done(&self) -> Result<bool, Error> {
@@ -112,6 +131,7 @@ impl Act for Sound {
     }
 
     fn cancel(&mut self) -> Result<(), Error> {
+        self.activated = false;
         self.player.pause()
     }
 }
@@ -216,6 +236,8 @@ mod play {
                 .recv_timeout(READ_DURATION_TIMEOUT)
                 .map_err(|_| format_err!("Could not obtain media duration: {:?}", file.as_ref()))?;
 
+            player.pause();
+
             Ok(Player {
                 _instance: instance,
                 media,
@@ -226,6 +248,10 @@ mod play {
         }
 
         pub fn play(&mut self) -> Result<(), Error> {
+            if self.playing() {
+                return Ok(())
+            }
+
             self.player.play().map_err(|_| {
                 format_err!(
                     "Could not play media {:?}",
@@ -238,9 +264,13 @@ mod play {
         }
 
         pub fn pause(&mut self) -> Result<(), Error> {
+            if !self.playing() {
+                return Ok(())
+            }
+
             if !self.player.can_pause() {
                 bail!(
-                    "Could not pause media {:?}",
+                    "Media can not currently be paused {:?}",
                     self.media.mrl().unwrap_or("<Could not obtain mrl>".into())
                 );
             }
@@ -258,9 +288,10 @@ mod play {
             match self.last_pause_request {
                 Some((at, paused)) if at.elapsed() < PAUSE_DIRTY_TIMEOUT => !paused,
                 _ => match self.player.state() {
-                    State::NothingSpecial | State::Opening | State::Buffering | State::Playing => {
+                    State::Opening | State::Buffering | State::Playing => {
                         true
                     }
+                    State::NothingSpecial |
                     State::Paused | State::Stopped | State::Ended | State::Error => false,
                 },
             }

@@ -10,19 +10,25 @@ use tavla::{any_voice, Voice};
 
 pub struct Actuators {
     active: Vec<Box<dyn Act>>,
-    sounds: Vec<Option<Sound>>,
+    sounds: Vec<Sound>,
     phone: Option<Arc<Mutex<Phone>>>,
     sound_specs: Vec<SoundSpec>,
 }
 
 impl Actuators {
-    pub fn new(phone: &Option<Arc<Mutex<Phone>>>, sound_specs: &[SoundSpec]) -> Self {
-        Actuators {
+    pub fn new(phone: &Option<Arc<Mutex<Phone>>>, sound_specs: &[SoundSpec]) -> Result<Self, Error> {
+        let sounds = sound_specs.iter()
+                .map(Sound::from_spec)
+                .collect::<Result<Vec<Sound>, _>>()?;
+
+        let actuators = Actuators {
             active: vec![],
-            sounds: (0..sound_specs.len()).map(|_| None).collect(),
+            sounds,
             phone: phone.as_ref().map(Arc::clone),
             sound_specs: sound_specs.to_vec(),
-        }
+        };
+
+        Ok(actuators)
     }
 
     pub fn update(&mut self) -> Result<(), Error> {
@@ -44,18 +50,10 @@ impl Actuators {
             !done
         });
 
-        // update and remove finished sounds
-        for sound_opt in self.sounds.iter_mut() {
-            if let Some(sound_act) = sound_opt.as_mut() {
-                sound_act
-                    .update()
-                    .unwrap_or_else(|_| warn!("Failed to update sound: {:?}", &sound_act));
-
-                if sound_act.done().unwrap_or(false) {
-                    debug!("Sound is done: {:?}", sound_act);
-                    *sound_opt = None;
-                }
-            }
+        // update sounds
+        for sound_act in self.sounds.iter_mut() {
+            sound_act.update()
+                .unwrap_or_else(|_| warn!("Failed to update sound: {:?}", &sound_act));
         }
 
         Ok(())
@@ -72,11 +70,7 @@ impl Actuators {
                 .iter()
                 .zip(self.sound_specs.iter())
                 .all(|(sound, spec)| {
-                    spec.is_loop()
-                        || sound
-                            .as_ref()
-                            .map(|s| s.done().unwrap_or(false))
-                            .unwrap_or(true)
+                    spec.is_loop() || sound.done().unwrap_or(true)
                 })
     }
 
@@ -87,27 +81,24 @@ impl Actuators {
     }
 
     fn transition_sounds(&mut self, state: &State) -> Result<(), Error> {
-        for (idx, sound_opt) in self.sounds.iter_mut().enumerate() {
-            // Cancel sounds that are not in the new set
-            if !state.sounds().contains(&idx) {
-                if let Some(sound) = sound_opt.as_mut() {
-                    debug!("Stopping sound: {:?}", self.sound_specs[idx].source());
-                    sound.cancel()?;
-                }
-                *sound_opt = None;
-            } else {
-                // Only add a new sound if not already there (background music)
-                if sound_opt.is_none() {
+        for (idx, sound) in self.sounds.iter_mut().enumerate() {
+            let done = sound.done().unwrap_or(true);
+
+            if state.sounds().contains(&idx) {
+                if done {
+                    // Activate sounds in the set that are currently inactive
                     debug!("Starting sound: {:?}", self.sound_specs[idx].source());
-
-                    let new_sound = Sound::from_spec(&self.sound_specs[idx])
-                        .and_then(|mut s| s.activate().map(|_| s));
-
-                    match new_sound {
-                        Ok(sound) => *sound_opt = Some(sound),
-                        Err(err) => warn!("Failed to activate sound: {}", err)
-                    }
+                    sound.activate()
+                        .unwrap_or_else(|e| warn!("Failed to activate sound: {}", e));
+                } else {
+                    // And keep the ones that are already playing
+                    debug!("Keeping active sound on re-enter: {:?}", self.sound_specs[idx].source());
                 }
+            } else if !done {
+                // Cancel sounds that are not in the new set
+                debug!("Stopping sound: {:?}", self.sound_specs[idx].source());
+                sound.cancel()
+                    .unwrap_or_else(|e| warn!("Failed to deactivate sound: {:?}", e));
             }
         }
 

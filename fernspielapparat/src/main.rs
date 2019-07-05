@@ -125,7 +125,7 @@ fn launch(book: Book) -> Result<(), Error> {
     }
 
     let sensors = init_sensors(&phone);
-    let actuators = Actuators::new(&phone, book.sounds());
+    let actuators = Actuators::new(&phone, book.sounds())?;
     let mut machine = Machine::new(sensors, actuators, book.states());
 
     while !termination_requested.load(SeqCst) && machine.update() {

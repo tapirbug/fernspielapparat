@@ -142,7 +142,7 @@ mod test {
     #[test]
     #[should_panic]
     fn machine_without_states() {
-        Machine::new(Sensors::builder().build(), Actuators::new(&None, &[]), &[]);
+        Machine::new(Sensors::builder().build(), Actuators::new(&None, &[]).unwrap(), &[]);
     }
 
     #[test]
@@ -150,7 +150,7 @@ mod test {
     fn out_of_bounds_end_transition_target() {
         Machine::new(
             Sensors::builder().build(),
-            Actuators::new(&None, &[]),
+            Actuators::new(&None, &[]).unwrap(),
             &[State::builder()
                 .name("with illegal end transition target")
                 .end(1)
@@ -232,7 +232,7 @@ mod test {
 
         let mut machine = Machine::new(
             Sensors::builder().build(),
-            Actuators::new(&None, &[]),
+            Actuators::new(&None, &[]).unwrap(),
             states,
         );
 
