@@ -1,6 +1,6 @@
 use crate::acts::Act;
 use derivative::Derivative;
-use failure::{bail, Error};
+use failure::Error;
 use log::debug;
 use play::Player;
 use std::path::{Path, PathBuf};
@@ -115,21 +115,36 @@ impl Sound {
             self.rewind()
         }
     }
+
+    fn seek_on_reenter(&mut self, was_active: bool) {
+        if was_active {
+            // Was previously playing, keep going
+        } else {
+            let has_backoff = self.spec.backoff.as_millis() > 0;
+            self.player.seek(if has_backoff {
+                // Non-zero backoff configured, instead of rewinding
+                // subtract the backoff from the current playback
+                // position and clamp at the start of the file.
+                self.player
+                    .played()
+                    .checked_sub(self.spec.backoff)
+                    .unwrap_or_else(|| Duration::from_millis(0))
+            } else {
+                // No backoff configured, rewind to the start offset
+                self.spec.start_offset
+            });
+        }
+    }
 }
 
 impl Act for Sound {
     fn activate(&mut self) -> Result<(), Error> {
-        self.rewind_unless_already_active();
-
+        let was_active = self.activated;
         self.activated = true;
+        self.rewind_unless_already_active();
         self.player.play()?;
-        self.player.seek(self.spec.start_offset);
-
-        if self.player.played() >= self.spec.start_offset {
-            Ok(())
-        } else {
-            bail!("Failed to seek to: {:?}", self.spec.start_offset)
-        }
+        self.seek_on_reenter(was_active);
+        Ok(())
     }
 
     fn update(&mut self) -> Result<(), Error> {
