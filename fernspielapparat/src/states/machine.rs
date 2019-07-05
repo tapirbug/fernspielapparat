@@ -142,7 +142,11 @@ mod test {
     #[test]
     #[should_panic]
     fn machine_without_states() {
-        Machine::new(Sensors::builder().build(), Actuators::new(&None, &[]).unwrap(), &[]);
+        Machine::new(
+            Sensors::builder().build(),
+            Actuators::new(&None, &[]).unwrap(),
+            &[],
+        );
     }
 
     #[test]

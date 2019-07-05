@@ -1,10 +1,10 @@
 use crate::acts::Act;
 use derivative::Derivative;
-use failure::{Error, bail};
+use failure::{bail, Error};
+use log::debug;
 use play::Player;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use log::debug;
 
 /// Plays a sound file in the background.
 #[derive(Derivative)]
@@ -24,7 +24,7 @@ pub struct SoundSpec {
     source: PathBuf,
     end: EndBehavior,
     start_offset: Duration,
-    backoff: Duration
+    backoff: Duration,
 }
 
 impl SoundSpec {
@@ -33,12 +33,17 @@ impl SoundSpec {
             source,
             end,
             start_offset,
-            backoff
+            backoff,
         }
     }
 
     pub fn once<P: AsRef<Path>>(source: P, start_offset: Duration, backoff: Duration) -> Self {
-        Self::new(source.as_ref().into(), EndBehavior::Done, start_offset, backoff)
+        Self::new(
+            source.as_ref().into(),
+            EndBehavior::Done,
+            start_offset,
+            backoff,
+        )
     }
 
     pub fn repeat<P: AsRef<Path>>(source: P, start_offset: Duration, backoff: Duration) -> Self {
@@ -46,13 +51,18 @@ impl SoundSpec {
             source.as_ref().into(),
             EndBehavior::Loop,
             start_offset,
-            backoff
+            backoff,
         )
     }
 
     #[cfg(test)]
     pub fn seek_then_repeat<P: AsRef<Path>>(source: P, start_offset: Duration) -> Self {
-        Self::new(source.as_ref().into(), EndBehavior::Loop, start_offset, Duration::from_millis(0))
+        Self::new(
+            source.as_ref().into(),
+            EndBehavior::Loop,
+            start_offset,
+            Duration::from_millis(0),
+        )
     }
 
     pub fn source(&self) -> &Path {
@@ -147,7 +157,7 @@ mod test {
         let mut sound = Sound::from_spec(&SoundSpec::once(
             "test/A Good Bass for Gambling.mp3",
             Duration::from_secs(2 * 60 + 34), // Start almost at the end
-            Duration::from_millis(0), // No backoff
+            Duration::from_millis(0),         // No backoff
         ))
         .unwrap();
 
@@ -167,7 +177,7 @@ mod test {
     fn elevator_music_loop_then_cancel() {
         let mut sound = Sound::from_spec(&SoundSpec::seek_then_repeat(
             "test/A Good Bass for Gambling.mp3",
-            Duration::from_secs(2 * 60 + 30)
+            Duration::from_secs(2 * 60 + 30),
         ))
         .expect("Could not make sound");
 
@@ -220,14 +230,16 @@ mod play {
                 .ok_or_else(|| format_err!("Could not load media {:?}", file.as_ref()))?;
 
             let (tx, rx) = channel::<Duration>();
-            media.event_manager().attach(vlc::EventType::MediaDurationChanged, move |e, _| {
-                match e {
+            media
+                .event_manager()
+                .attach(vlc::EventType::MediaDurationChanged, move |e, _| match e {
                     vlc::Event::MediaDurationChanged(duration) => {
-                        tx.send(Duration::from_millis(duration.try_into().unwrap_or(0))).ok();
-                    },
+                        tx.send(Duration::from_millis(duration.try_into().unwrap_or(0)))
+                            .ok();
+                    }
                     _ => (),
-                }
-            }).map_err(|_| format_err!("Could not obtain media duration: {:?}", file.as_ref()))?;
+                })
+                .map_err(|_| format_err!("Could not obtain media duration: {:?}", file.as_ref()))?;
 
             media.parse();
             player.set_media(&media);
@@ -249,7 +261,7 @@ mod play {
 
         pub fn play(&mut self) -> Result<(), Error> {
             if self.playing() {
-                return Ok(())
+                return Ok(());
             }
 
             self.player.play().map_err(|_| {
@@ -265,7 +277,7 @@ mod play {
 
         pub fn pause(&mut self) -> Result<(), Error> {
             if !self.playing() {
-                return Ok(())
+                return Ok(());
             }
 
             if !self.player.can_pause() {
@@ -288,11 +300,12 @@ mod play {
             match self.last_pause_request {
                 Some((at, paused)) if at.elapsed() < PAUSE_DIRTY_TIMEOUT => !paused,
                 _ => match self.player.state() {
-                    State::Opening | State::Buffering | State::Playing => {
-                        true
-                    }
-                    State::NothingSpecial |
-                    State::Paused | State::Stopped | State::Ended | State::Error => false,
+                    State::Opening | State::Buffering | State::Playing => true,
+                    State::NothingSpecial
+                    | State::Paused
+                    | State::Stopped
+                    | State::Ended
+                    | State::Error => false,
                 },
             }
         }

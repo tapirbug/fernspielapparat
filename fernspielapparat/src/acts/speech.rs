@@ -8,7 +8,7 @@ impl<T: Speech> Act for T {
     fn activate(&mut self) -> Result<(), Error> {
         Ok(())
     }
-    
+
     fn update(&mut self) -> Result<(), Error> {
         Ok(())
     }

@@ -16,10 +16,14 @@ pub struct Actuators {
 }
 
 impl Actuators {
-    pub fn new(phone: &Option<Arc<Mutex<Phone>>>, sound_specs: &[SoundSpec]) -> Result<Self, Error> {
-        let sounds = sound_specs.iter()
-                .map(Sound::from_spec)
-                .collect::<Result<Vec<Sound>, _>>()?;
+    pub fn new(
+        phone: &Option<Arc<Mutex<Phone>>>,
+        sound_specs: &[SoundSpec],
+    ) -> Result<Self, Error> {
+        let sounds = sound_specs
+            .iter()
+            .map(Sound::from_spec)
+            .collect::<Result<Vec<Sound>, _>>()?;
 
         let actuators = Actuators {
             active: vec![],
@@ -52,7 +56,8 @@ impl Actuators {
 
         // update sounds
         for sound_act in self.sounds.iter_mut() {
-            sound_act.update()
+            sound_act
+                .update()
                 .unwrap_or_else(|_| warn!("Failed to update sound: {:?}", &sound_act));
         }
 
@@ -69,9 +74,7 @@ impl Actuators {
                 .sounds
                 .iter()
                 .zip(self.sound_specs.iter())
-                .all(|(sound, spec)| {
-                    spec.is_loop() || sound.done().unwrap_or(true)
-                })
+                .all(|(sound, spec)| spec.is_loop() || sound.done().unwrap_or(true))
     }
 
     pub fn transition_to(&mut self, state: &State) -> Result<(), Error> {
@@ -88,16 +91,21 @@ impl Actuators {
                 if done {
                     // Activate sounds in the set that are currently inactive
                     debug!("Starting sound: {:?}", self.sound_specs[idx].source());
-                    sound.activate()
+                    sound
+                        .activate()
                         .unwrap_or_else(|e| warn!("Failed to activate sound: {}", e));
                 } else {
                     // And keep the ones that are already playing
-                    debug!("Keeping active sound on re-enter: {:?}", self.sound_specs[idx].source());
+                    debug!(
+                        "Keeping active sound on re-enter: {:?}",
+                        self.sound_specs[idx].source()
+                    );
                 }
             } else if !done {
                 // Cancel sounds that are not in the new set
                 debug!("Stopping sound: {:?}", self.sound_specs[idx].source());
-                sound.cancel()
+                sound
+                    .cancel()
                     .unwrap_or_else(|e| warn!("Failed to deactivate sound: {:?}", e));
             }
         }

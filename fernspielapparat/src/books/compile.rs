@@ -12,16 +12,16 @@ mod book {
     use crate::acts::SoundSpec;
     use crate::books::spec;
     use crate::states::State;
-    use failure::{Error, format_err, bail};
-    use log::{warn, debug};
+    use failure::{bail, format_err, Error};
+    use log::{debug, warn};
+    use std::collections::hash_map::DefaultHasher;
+    use std::fs::write;
+    use std::hash::Hasher;
     use std::path::{Path, PathBuf};
     use tavla::{any_voice, Speech, Voice};
     use tempfile::{tempdir, TempDir};
-    use std::fs::write;
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::Hasher;
 
-    const KIB : usize = 1024;
+    const KIB: usize = 1024;
 
     pub struct Book {
         pub(crate) states: Vec<State>,
@@ -57,7 +57,7 @@ mod book {
 
     impl BookBuilder {
         /// No more than 256KiB of text are allowed for synthesis.
-        const MAX_TEXT_LEN : usize = 256 * KIB;
+        const MAX_TEXT_LEN: usize = 256 * KIB;
 
         pub fn state(&mut self, state: State) -> &mut Self {
             self.book.states.push(state);
@@ -91,36 +91,43 @@ mod book {
             }
 
             match Self::prepare_data_uri(&sound.file, cache_directory) {
-                Ok(Some(persisted_data_uri_path)) => sound.file = persisted_data_uri_path.to_str().unwrap().into(),
+                Ok(Some(persisted_data_uri_path)) => {
+                    sound.file = persisted_data_uri_path.to_str().unwrap().into()
+                }
                 Ok(None) => (),
-                Err(e) => return Err(From::from(e))
+                Err(e) => return Err(From::from(e)),
             };
 
             Ok(())
         }
 
-        fn prepare_data_uri(potential_data_uri: &str, cache_directory: &Path) -> Result<Option<PathBuf>, Error> {
+        fn prepare_data_uri(
+            potential_data_uri: &str,
+            cache_directory: &Path,
+        ) -> Result<Option<PathBuf>, Error> {
             use base64::decode;
 
             if potential_data_uri.starts_with("data:") {
                 let rest = &potential_data_uri["data:".len()..];
-                let mime_end = rest[0..rest.len().min(32)].find(";base64,").ok_or_else(|| format_err!("Data uri was not base64"))?;
+                let mime_end = rest[0..rest.len().min(32)]
+                    .find(";base64,")
+                    .ok_or_else(|| format_err!("Data uri was not base64"))?;
                 let mime = &rest[0..mime_end];
                 let content = decode(&rest[(mime_end + ";base64,".len())..].trim())?;
 
                 let mut hash = DefaultHasher::new();
                 hash.write(&content);
                 let extension = match mime {
-                    "audio/mpeg" 
-                    | "audio/mp3" 
-                    | "audio/mpeg3" 
-                    | "audio/x-mpeg-3" 
-                    | "video/mpeg" 
-                    | "video/x-mpeg" => "mp3",
-                    _ => "wav"
+                    "audio/mpeg" | "audio/mp3" | "audio/mpeg3" | "audio/x-mpeg-3"
+                    | "video/mpeg" | "video/x-mpeg" => "mp3",
+                    _ => "wav",
                 };
                 let mut path = PathBuf::from(cache_directory);
-                path.push(format!("{name}.{extension}", name=hash.finish(), extension=extension));
+                path.push(format!(
+                    "{name}.{extension}",
+                    name = hash.finish(),
+                    extension = extension
+                ));
                 debug!("Writing base64 encoded {:?}", path);
 
                 write(&path, &content)?;
@@ -139,16 +146,22 @@ mod book {
 
             let offset = sound.start_offset.unwrap_or(0.0);
             let offset = if offset < 0.0 {
-                bail!("Encountered negative start offset: {}. \
-                       Positive was expected.", offset)
+                bail!(
+                    "Encountered negative start offset: {}. \
+                     Positive was expected.",
+                    offset
+                )
             } else {
                 Duration::from_millis((offset * 1000.0) as u64)
             };
 
             let backoff = sound.backoff.unwrap_or(0.0);
             let backoff = if backoff < 0.0 {
-                bail!("Encountered negative backoff: {}. \
-                       Positive was expected.", backoff)
+                bail!(
+                    "Encountered negative backoff: {}. \
+                     Positive was expected.",
+                    backoff
+                )
             } else {
                 Duration::from_millis((backoff * 1000.0) as u64)
             };
@@ -169,17 +182,14 @@ mod book {
     fn shrink_to_max(text: &mut String, max: usize) {
         warn!(
             "Sound text has a size of {actual}KiB, \
-                which exceeds the maximum of {max}KiB \
-                by {excess}KiB. \
-                Text is cut off after the maximum size.",
+             which exceeds the maximum of {max}KiB \
+             by {excess}KiB. \
+             Text is cut off after the maximum size.",
             actual = text.len() / KIB,
             max = max / KIB,
             excess = (text.len() - max) / KIB
         );
-        text.replace_range(
-            next_char_boundary(&text, max)..,
-            ""
-        );
+        text.replace_range(next_char_boundary(&text, max).., "");
     }
 
     fn next_char_boundary(string: &str, search_start: usize) -> usize {
