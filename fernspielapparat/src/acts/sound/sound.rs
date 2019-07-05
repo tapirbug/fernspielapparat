@@ -3,8 +3,8 @@ use derivative::Derivative;
 use failure::Error;
 use log::debug;
 use play::Player;
-use std::path::{Path, PathBuf};
 use std::time::Duration;
+use super::{SoundSpec, ReenterBehavior};
 
 /// Plays a sound file in the background.
 #[derive(Derivative)]
@@ -17,71 +17,6 @@ pub struct Sound {
     /// was `activate`, otherwise `cancel`. If neither has been called,
     /// is `false`.
     activated: bool,
-}
-
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct SoundSpec {
-    source: PathBuf,
-    end: EndBehavior,
-    start_offset: Duration,
-    backoff: Duration,
-}
-
-impl SoundSpec {
-    fn new(source: PathBuf, end: EndBehavior, start_offset: Duration, backoff: Duration) -> Self {
-        SoundSpec {
-            source,
-            end,
-            start_offset,
-            backoff,
-        }
-    }
-
-    pub fn once<P: AsRef<Path>>(source: P, start_offset: Duration, backoff: Duration) -> Self {
-        Self::new(
-            source.as_ref().into(),
-            EndBehavior::Done,
-            start_offset,
-            backoff,
-        )
-    }
-
-    pub fn repeat<P: AsRef<Path>>(source: P, start_offset: Duration, backoff: Duration) -> Self {
-        Self::new(
-            source.as_ref().into(),
-            EndBehavior::Loop,
-            start_offset,
-            backoff,
-        )
-    }
-
-    #[cfg(test)]
-    pub fn seek_then_repeat<P: AsRef<Path>>(source: P, start_offset: Duration) -> Self {
-        Self::new(
-            source.as_ref().into(),
-            EndBehavior::Loop,
-            start_offset,
-            Duration::from_millis(0),
-        )
-    }
-
-    pub fn source(&self) -> &Path {
-        &self.source
-    }
-
-    pub fn is_loop(&self) -> bool {
-        if let EndBehavior::Loop = self.end {
-            true
-        } else {
-            false
-        }
-    }
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
-enum EndBehavior {
-    Done,
-    Loop,
 }
 
 impl Sound {
@@ -120,19 +55,21 @@ impl Sound {
         if was_active {
             // Was previously playing, keep going
         } else {
-            let has_backoff = self.spec.backoff.as_millis() > 0;
-            self.player.seek(if has_backoff {
-                // Non-zero backoff configured, instead of rewinding
-                // subtract the backoff from the current playback
-                // position and clamp at the start of the file.
-                self.player
-                    .played()
-                    .checked_sub(self.spec.backoff)
-                    .unwrap_or_else(|| Duration::from_millis(0))
-            } else {
-                // No backoff configured, rewind to the start offset
-                self.spec.start_offset
-            });
+            // Re-enter, either backoff or rewind to start position
+            self.player.seek(
+                match self.spec.reenter_behavior() {
+                    ReenterBehavior::Backoff(backoff) => {
+                        // subtract the backoff from the current playback
+                        // position and clamp at the start of the file.
+                        self.player
+                            .played()
+                            .checked_sub(backoff)
+                            .unwrap_or_else(|| Duration::from_millis(0))
+                    },
+                    // No backoff configured, rewind to the start offset
+                    ReenterBehavior::Seek(to) => to,
+                }
+            )
         }
     }
 }
@@ -158,54 +95,6 @@ impl Act for Sound {
     fn cancel(&mut self) -> Result<(), Error> {
         self.activated = false;
         self.player.pause()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use std::time::Instant;
-
-    use std::thread::sleep;
-    #[test]
-    fn once_with_offset() {
-        let mut sound = Sound::from_spec(&SoundSpec::once(
-            "test/A Good Bass for Gambling.mp3",
-            Duration::from_secs(2 * 60 + 34), // Start almost at the end
-            Duration::from_millis(0),         // No backoff
-        ))
-        .unwrap();
-
-        sound.activate().unwrap();
-        sound.update().unwrap();
-        assert!(!sound.done().unwrap());
-        let play_start_time = Instant::now();
-        while !sound.done().unwrap() {
-            sleep(Duration::from_secs(1));
-            sound.update().unwrap();
-        }
-        assert!(play_start_time.elapsed() < Duration::from_secs(5));
-        assert!(play_start_time.elapsed() > Duration::from_millis(50))
-    }
-
-    #[test]
-    fn elevator_music_loop_then_cancel() {
-        let mut sound = Sound::from_spec(&SoundSpec::seek_then_repeat(
-            "test/A Good Bass for Gambling.mp3",
-            Duration::from_secs(2 * 60 + 30),
-        ))
-        .expect("Could not make sound");
-
-        sound.activate().unwrap();
-        sound.update().unwrap();
-        assert!(!sound.done().unwrap());
-        sleep(Duration::from_millis(4_000));
-        sound.update().unwrap();
-        assert!(!sound.done().unwrap());
-
-        sound.cancel().unwrap();
-
-        assert!(sound.done().unwrap());
     }
 }
 
@@ -381,5 +270,53 @@ mod play {
                 "Player should be paused after reaching the end of the media"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::time::Instant;
+
+    use std::thread::sleep;
+    #[test]
+    fn once_with_offset() {
+        let mut sound = Sound::from_spec(&SoundSpec::once(
+            "test/A Good Bass for Gambling.mp3",
+            Duration::from_secs(2 * 60 + 34), // Start almost at the end
+            Duration::from_millis(0),         // No backoff
+        ))
+        .unwrap();
+
+        sound.activate().unwrap();
+        sound.update().unwrap();
+        assert!(!sound.done().unwrap());
+        let play_start_time = Instant::now();
+        while !sound.done().unwrap() {
+            sleep(Duration::from_secs(1));
+            sound.update().unwrap();
+        }
+        assert!(play_start_time.elapsed() < Duration::from_secs(5));
+        assert!(play_start_time.elapsed() > Duration::from_millis(50))
+    }
+
+    #[test]
+    fn elevator_music_loop_then_cancel() {
+        let mut sound = Sound::from_spec(&SoundSpec::seek_then_repeat(
+            "test/A Good Bass for Gambling.mp3",
+            Duration::from_secs(2 * 60 + 30),
+        ))
+        .expect("Could not make sound");
+
+        sound.activate().unwrap();
+        sound.update().unwrap();
+        assert!(!sound.done().unwrap());
+        sleep(Duration::from_millis(4_000));
+        sound.update().unwrap();
+        assert!(!sound.done().unwrap());
+
+        sound.cancel().unwrap();
+
+        assert!(sound.done().unwrap());
     }
 }
