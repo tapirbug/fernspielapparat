@@ -4,6 +4,7 @@ use failure::Error;
 use log::debug;
 use play::Player;
 use std::time::Duration;
+use std::cmp::max;
 use super::{SoundSpec, ReenterBehavior};
 
 /// Plays a sound file in the background.
@@ -32,13 +33,9 @@ impl Sound {
         Ok(sound)
     }
 
-    fn rewind(&mut self) {
-        self.player.seek(Duration::from_millis(0));
-    }
-
     fn ensure_loop_if_active(&mut self) -> Result<(), Error> {
         if self.activated && self.spec.is_loop() && !self.player.playing() {
-            self.rewind();
+            // note: not applying the start offset on purpose for looping
             self.player.play()?;
         }
         Ok(())
@@ -46,8 +43,8 @@ impl Sound {
 
     fn rewind_unless_already_active(&mut self) {
         if !self.activated {
-            debug!("Rewinding sound on re-enter: {:?}", &self.spec);
-            self.rewind()
+            debug!("Rewinding sound to {:?} on re-enter: {:?}", self.spec.start_offset(), &self.spec);
+            self.player.seek(self.spec.start_offset());
         }
     }
 
@@ -57,18 +54,46 @@ impl Sound {
         } else {
             // Re-enter, either backoff or rewind to start position
             self.player.seek(
-                match self.spec.reenter_behavior() {
-                    ReenterBehavior::Backoff(backoff) => {
+                match (self.spec.is_loop(), self.spec.reenter_behavior()) {
+                    (true, ReenterBehavior::Backoff(backoff)) => {
+                        // backoff in looping
                         // subtract the backoff from the current playback
-                        // position and clamp at the start of the file.
-                        self.player
-                            .played()
-                            .checked_sub(backoff)
-                            .unwrap_or_else(|| Duration::from_millis(0))
+                        // position and wrap around the end when reaching zero
+                        let duration = self.player.duration();
+                        let backoff = duration_mod(backoff, duration);
+                        let played = self.player.played();
+
+                        if backoff > played {
+                            // wrap around the end
+                            duration - (backoff - played)
+                        } else {
+                            played - backoff
+                        }
                     },
-                    // No backoff configured, rewind to the start offset
-                    ReenterBehavior::Seek(to) => to,
+                    (false, ReenterBehavior::Backoff(backoff)) => {
+                        // backoff without looping
+                        // subtract the backoff from the current playback
+                        // position and clamp at the start offset.
+                        let start_offset = self.spec.start_offset();
+                        max(
+                            start_offset,
+                            self.player
+                                .played()
+                                .checked_sub(backoff)
+                                .unwrap_or(start_offset)
+                        )
+                        
+                    },
+                    // No backoff configured, rewind to the start offset,
+                    // regardless of whether or not looping is on.
+                    (_, ReenterBehavior::Seek(to)) => to,
                 }
+            )
+        }
+
+        fn duration_mod(duration: Duration, max_duration: Duration) -> Duration {
+            Duration::from_nanos(
+                (duration.as_nanos() as u64) % (max_duration.as_nanos() as u64)
             )
         }
     }

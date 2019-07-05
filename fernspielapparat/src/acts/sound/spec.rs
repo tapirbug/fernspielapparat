@@ -6,6 +6,7 @@ use std::time::Duration;
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct SoundSpec {
     source: PathBuf,
+    start_offset: Duration,
     end: EndBehavior,
     reenter: ReenterBehavior,
 }
@@ -25,6 +26,10 @@ impl SoundSpec {
         } else {
             false
         }
+    }
+
+    pub fn start_offset(&self) -> Duration {
+        self.start_offset
     }
 
     pub fn reenter_behavior(&self) -> ReenterBehavior {
@@ -85,6 +90,7 @@ mod builder {
             SoundSpecBuilder {
                 spec: SoundSpec {
                     source: source.into(),
+                    start_offset: Duration::from_millis(0),
                     end: Default::default(),
                     reenter: Default::default()
                 }
@@ -101,8 +107,9 @@ mod builder {
         }
 
         pub fn start_offset(&mut self, backoff: impl Into<f64>) -> Result<&mut Self> {
+            self.spec.start_offset = f64_to_duration(backoff, "start offset")?;
             self.spec.reenter = ReenterBehavior::Seek(
-                f64_to_duration(backoff, "start offset")?
+                self.spec.start_offset
             );
             Ok(self)
         }
