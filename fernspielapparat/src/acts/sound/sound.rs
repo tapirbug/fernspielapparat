@@ -281,12 +281,12 @@ mod test {
     use std::thread::sleep;
     #[test]
     fn once_with_offset() {
-        let mut sound = Sound::from_spec(&SoundSpec::once(
-            "test/A Good Bass for Gambling.mp3",
-            Duration::from_secs(2 * 60 + 34), // Start almost at the end
-            Duration::from_millis(0),         // No backoff
-        ))
-        .unwrap();
+        let mut sound = Sound::from_spec(
+            &SoundSpec::builder()
+                .source("test/A Good Bass for Gambling.mp3")
+                .start_offset(2.0 * 60.0 + 34.0).unwrap() // Start almost at the end
+                .build()
+        ).unwrap();
 
         sound.activate().unwrap();
         sound.update().unwrap();
@@ -302,10 +302,13 @@ mod test {
 
     #[test]
     fn elevator_music_loop_then_cancel() {
-        let mut sound = Sound::from_spec(&SoundSpec::seek_then_repeat(
-            "test/A Good Bass for Gambling.mp3",
-            Duration::from_secs(2 * 60 + 30),
-        ))
+        let mut sound = Sound::from_spec(
+            &SoundSpec::builder()
+                .source("test/A Good Bass for Gambling.mp3")
+                .start_offset(2 * 60 + 30).unwrap()
+                .looping(true)
+                .build()
+        )
         .expect("Could not make sound");
 
         sound.activate().unwrap();

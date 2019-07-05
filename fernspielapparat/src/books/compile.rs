@@ -12,7 +12,7 @@ mod book {
     use crate::acts::SoundSpec;
     use crate::books::spec;
     use crate::states::State;
-    use failure::{bail, format_err, Error};
+    use failure::{format_err, Error};
     use log::{debug, warn};
     use std::collections::hash_map::DefaultHasher;
     use std::fs::write;
@@ -138,39 +138,26 @@ mod book {
         }
 
         pub fn sound(&mut self, mut sound: spec::Sound) -> Result<&mut Self, Error> {
-            use std::time::Duration;
-
             let cache_directory: &Path = self.book.compiled_speech_dir.as_ref();
             Self::prepare_sound(&mut sound, cache_directory)?;
             let path = sound.file.clone();
 
-            let offset = sound.start_offset.unwrap_or(0.0);
-            let offset = if offset < 0.0 {
-                bail!(
-                    "Encountered negative start offset: {}. \
-                     Positive was expected.",
-                    offset
-                )
-            } else {
-                Duration::from_millis((offset * 1000.0) as u64)
-            };
+            self.book.sounds.push({
+                let mut builder = SoundSpec::builder()
+                    .source(path);
 
-            let backoff = sound.backoff.unwrap_or(0.0);
-            let backoff = if backoff < 0.0 {
-                bail!(
-                    "Encountered negative backoff: {}. \
-                     Positive was expected.",
-                    backoff
-                )
-            } else {
-                Duration::from_millis((backoff * 1000.0) as u64)
-            };
+                if let Some(offset) = sound.start_offset {
+                    builder.start_offset(offset)?;
+                }
 
-            self.book.sounds.push(if sound.looping {
-                SoundSpec::repeat(path, offset, backoff)
-            } else {
-                SoundSpec::once(path, offset, backoff)
+                if let Some(backoff) = sound.backoff {
+                    builder.backoff(backoff)?;
+                }
+
+                builder.looping(sound.looping)
+                    .build()
             });
+
             Ok(self)
         }
 
