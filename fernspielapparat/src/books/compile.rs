@@ -108,7 +108,7 @@ mod book {
                     sound.file = persisted_data_uri_path.to_str().unwrap().into()
                 }
                 Ok(None) => (),
-                Err(e) => return Err(From::from(e)),
+                Err(err) => return Err(err),
             };
 
             Ok(())
@@ -196,7 +196,7 @@ mod book {
         } else {
             (search_start..string.len())
                 .find(|i| string.is_char_boundary(*i))
-                .unwrap_or(string.len())
+                .unwrap_or_else(|| string.len())
         }
     }
 

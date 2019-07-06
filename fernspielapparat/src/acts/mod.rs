@@ -1,14 +1,14 @@
 mod act;
 mod actuators;
 mod ring;
-mod sound;
+mod sounds;
 pub mod speech;
 mod wait;
 
 pub use act::Act;
 pub use actuators::Actuators;
 pub use ring::Ring;
-pub use sound::{Ensemble, Sound, SoundSpec};
+pub use sounds::{Ensemble, Sound, SoundSpec};
 pub use wait::Wait;
 
 #[cfg(test)]
