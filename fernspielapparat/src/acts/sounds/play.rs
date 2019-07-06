@@ -40,9 +40,11 @@ impl Player {
         let (tx, rx) = channel::<Duration>();
         media
             .event_manager()
-            .attach(vlc::EventType::MediaDurationChanged, move |e, _| if let vlc::Event::MediaDurationChanged(duration) = e {
+            .attach(vlc::EventType::MediaDurationChanged, move |e, _| {
+                if let vlc::Event::MediaDurationChanged(duration) = e {
                     tx.send(Duration::from_millis(duration.try_into().unwrap_or(0)))
                         .ok();
+                }
             })
             .map_err(|_| format_err!("Could not obtain media duration: {:?}", file.as_ref()))?;
 
@@ -82,7 +84,9 @@ impl Player {
             self.player.play().map_err(|_| {
                 format_err!(
                     "Could not play media {:?}",
-                    self.media.mrl().unwrap_or_else(|| "<Could not obtain mrl>".into())
+                    self.media
+                        .mrl()
+                        .unwrap_or_else(|| "<Could not obtain mrl>".into())
                 )
             })?;
         }
@@ -90,7 +94,9 @@ impl Player {
         if !self.player.will_play() {
             bail!(
                 "Player cannot currently play media {:?}",
-                self.media.mrl().unwrap_or_else(|| "<Could not obtain mrl>".into())
+                self.media
+                    .mrl()
+                    .unwrap_or_else(|| "<Could not obtain mrl>".into())
             );
         }
 
@@ -111,7 +117,9 @@ impl Player {
         if !self.player.can_pause() {
             bail!(
                 "Media can not currently be paused {:?}",
-                self.media.mrl().unwrap_or_else(|| "<Could not obtain mrl>".into())
+                self.media
+                    .mrl()
+                    .unwrap_or_else(|| "<Could not obtain mrl>".into())
             );
         }
 
