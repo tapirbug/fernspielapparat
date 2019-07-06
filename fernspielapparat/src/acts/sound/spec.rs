@@ -41,7 +41,7 @@ impl SoundSpec {
 enum EndBehavior {
     Done,
     Loop,
-} 
+}
 
 impl Default for EndBehavior {
     fn default() -> Self {
@@ -52,36 +52,36 @@ impl Default for EndBehavior {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum ReenterBehavior {
     /// Subtract duration from last playback position on re-enter.
-    /// 
+    ///
     /// Re-enter occurs when a sound is activated and was not
     /// already activated.
     Backoff(Duration),
     /// Seek to this position on re-enter.
-    /// 
+    ///
     /// Re-enter occurs when a sound is activated and was not
     /// already activated.
-    Seek(Duration)
+    Rewind,
 }
 
 impl Default for ReenterBehavior {
     fn default() -> Self {
-        ReenterBehavior::Seek(Duration::from_millis(0))
+        ReenterBehavior::Rewind
     }
 }
 
 mod builder {
     use super::*;
-    use failure::{Error, bail};
+    use failure::{bail, Error};
 
     pub type Result<T> = std::result::Result<T, Error>;
 
     pub struct SoundSpecBuilder {
-        spec: SoundSpec
+        spec: SoundSpec,
     }
 
     /// Sound spec builder awaiting the specification of a
     /// source file before other properties can be set.
-    /// 
+    ///
     /// Building is also not possible yet.
     pub struct SoundSpecBuilderNeedingSource;
 
@@ -92,25 +92,20 @@ mod builder {
                     source: source.into(),
                     start_offset: Duration::from_millis(0),
                     end: Default::default(),
-                    reenter: Default::default()
-                }
+                    reenter: Default::default(),
+                },
             }
         }
     }
 
     impl SoundSpecBuilder {
         pub fn backoff(&mut self, backoff: impl Into<f64>) -> Result<&mut Self> {
-            self.spec.reenter = ReenterBehavior::Backoff(
-                f64_to_duration(backoff, "backoff")?
-            );
+            self.spec.reenter = ReenterBehavior::Backoff(f64_to_duration(backoff, "backoff")?);
             Ok(self)
         }
 
         pub fn start_offset(&mut self, backoff: impl Into<f64>) -> Result<&mut Self> {
             self.spec.start_offset = f64_to_duration(backoff, "start offset")?;
-            self.spec.reenter = ReenterBehavior::Seek(
-                self.spec.start_offset
-            );
             Ok(self)
         }
 
@@ -124,7 +119,7 @@ mod builder {
         }
 
         /// Builds the spec with the current config.
-        /// 
+        ///
         /// Can be called multiple times without build influenceing
         /// each other.
         pub fn build(&mut self) -> SoundSpec {
@@ -137,7 +132,7 @@ mod builder {
         if duration < 0.0 {
             bail!(
                 "Encountered negative {name}: {val}. \
-                    Positive was expected.",
+                 Positive was expected.",
                 name = property_name,
                 val = duration
             )
@@ -154,9 +149,9 @@ mod builder {
         #[test]
         fn negative_backoff() {
             let error = SoundSpecBuilderNeedingSource
-                    .source("/dev/null")
-                    .backoff(-0.0000001)
-                    .err();
+                .source("/dev/null")
+                .backoff(-0.0000001)
+                .err();
 
             assert!(
                 error.is_some(),
@@ -167,9 +162,9 @@ mod builder {
         #[test]
         fn negative_start_offset() {
             let error = SoundSpecBuilderNeedingSource
-                    .source("/dev/null")
-                    .start_offset(-0.0000001)
-                    .err();
+                .source("/dev/null")
+                .start_offset(-0.0000001)
+                .err();
 
             assert!(
                 error.is_some(),

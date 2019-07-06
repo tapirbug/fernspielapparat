@@ -14,6 +14,7 @@ mod book {
     use crate::states::State;
     use failure::{format_err, Error};
     use log::{debug, warn};
+    use std::cmp::min;
     use std::collections::hash_map::DefaultHasher;
     use std::fs::write;
     use std::hash::Hasher;
@@ -58,6 +59,9 @@ mod book {
     impl BookBuilder {
         /// No more than 256KiB of text are allowed for synthesis.
         const MAX_TEXT_LEN: usize = 256 * KIB;
+        /// Maximum amount of spoken text characters to include in
+        /// generated filenames.
+        const MAX_SUMMARY_LEN: usize = 60;
 
         pub fn state(&mut self, state: State) -> &mut Self {
             self.book.states.push(state);
@@ -78,9 +82,18 @@ mod book {
 
                 let mut hash = DefaultHasher::new();
                 hash.write(text.as_bytes());
+                let hash = hash.finish();
+
+                // work on a slice of the maximum summary length
+                // in case there are no whitespaces.
+                let summary = summarize(&text, Self::MAX_SUMMARY_LEN);
 
                 let mut filename = PathBuf::from(cache_directory);
-                filename.push(format!("{}.wav", hash.finish()));
+                filename.push(format!(
+                    "{hash}-{summary}.wav",
+                    hash = hash,
+                    summary = summary
+                ));
 
                 debug!("Preparing speech {:?}...", &filename);
                 debug!("Text: {:?}", text);
@@ -143,8 +156,7 @@ mod book {
             let path = sound.file.clone();
 
             self.book.sounds.push({
-                let mut builder = SoundSpec::builder()
-                    .source(path);
+                let mut builder = SoundSpec::builder().source(path);
 
                 if let Some(offset) = sound.start_offset {
                     builder.start_offset(offset)?;
@@ -154,8 +166,7 @@ mod book {
                     builder.backoff(backoff)?;
                 }
 
-                builder.looping(sound.looping)
-                    .build()
+                builder.looping(sound.looping).build()
             });
 
             Ok(self)
@@ -187,6 +198,31 @@ mod book {
                 .find(|i| string.is_char_boundary(*i))
                 .unwrap_or(string.len())
         }
+    }
+
+    /// Summary of text for inclusion in a filename or URL,
+    /// with only alphanumeric ascii letters and joining
+    /// hyphens.
+    fn summarize(text: &str, max_summary_len: usize) -> String {
+        text[0..min(text.len(), max_summary_len)]
+            // take a maximum of five words
+            .split_whitespace()
+            .take(5)
+            .map(|s| {
+                s.chars()
+                    // filter out characters that could make
+                    // problems in filenames and any incomplete
+                    // utf-8 sequence at the end.
+                    // (sorry if you are debugging a chinese
+                    // phonebook)
+                    .filter(char::is_ascii_alphanumeric)
+                    // and normalize them for case-insenitive
+                    // vs. case-sensitive filesystems
+                    .map(|c| c.to_ascii_lowercase())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("-")
     }
 
     #[cfg(test)]

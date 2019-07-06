@@ -19,3 +19,6 @@ derivative = "1.0.2"
 tempfile = "3.0.7"
 vlc-rs = "0.3.0"
 base64 = "0.10.1"
+
+[dev-dependencies]
+env_logger = "0.6.2"

@@ -8,7 +8,7 @@ mod wait;
 pub use act::Act;
 pub use actuators::Actuators;
 pub use ring::Ring;
-pub use sound::{Sound, SoundSpec};
+pub use sound::{Ensemble, Sound, SoundSpec};
 pub use wait::Wait;
 
 #[cfg(test)]

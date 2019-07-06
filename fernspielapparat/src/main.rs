@@ -13,6 +13,11 @@ extern crate tavla;
 extern crate tempfile;
 extern crate vlc;
 
+#[cfg(test)]
+extern crate env_logger;
+#[cfg(test)]
+mod testutil;
+
 mod acts;
 mod books;
 mod err;

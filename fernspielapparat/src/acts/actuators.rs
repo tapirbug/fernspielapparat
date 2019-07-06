@@ -1,4 +1,4 @@
-use crate::acts::{Act, Ring, Sound, SoundSpec, Wait};
+use crate::acts::{Act, Ensemble, Ring, SoundSpec, Wait};
 use crate::err::compound_result;
 use crate::phone::Phone;
 use crate::states::State;
@@ -10,9 +10,8 @@ use tavla::{any_voice, Voice};
 
 pub struct Actuators {
     active: Vec<Box<dyn Act>>,
-    sounds: Vec<Sound>,
     phone: Option<Arc<Mutex<Phone>>>,
-    sound_specs: Vec<SoundSpec>,
+    ensemble: Ensemble,
 }
 
 impl Actuators {
@@ -20,16 +19,10 @@ impl Actuators {
         phone: &Option<Arc<Mutex<Phone>>>,
         sound_specs: &[SoundSpec],
     ) -> Result<Self, Error> {
-        let sounds = sound_specs
-            .iter()
-            .map(Sound::from_spec)
-            .collect::<Result<Vec<Sound>, _>>()?;
-
         let actuators = Actuators {
             active: vec![],
-            sounds,
+            ensemble: Ensemble::from_specs(sound_specs)?,
             phone: phone.as_ref().map(Arc::clone),
-            sound_specs: sound_specs.to_vec(),
         };
 
         Ok(actuators)
@@ -55,10 +48,9 @@ impl Actuators {
         });
 
         // update sounds
-        for sound_act in self.sounds.iter_mut() {
-            sound_act
-                .update()
-                .unwrap_or_else(|_| warn!("Failed to update sound: {:?}", &sound_act));
+        let ensemble_update = self.ensemble.update();
+        if let Err(err) = ensemble_update {
+            error!("Sound update failures: {:?}", err);
         }
 
         Ok(())
@@ -69,47 +61,12 @@ impl Actuators {
     /// Returns `false` if some actuators are still working, e.g.
     /// speech is still ongoing.
     pub fn done(&self) -> bool {
-        self.active.is_empty()
-            && self
-                .sounds
-                .iter()
-                .zip(self.sound_specs.iter())
-                .all(|(sound, spec)| spec.is_loop() || sound.done().unwrap_or(true))
+        self.active.is_empty() && self.ensemble.non_loop_sounds_idle()
     }
 
     pub fn transition_to(&mut self, state: &State) -> Result<(), Error> {
-        self.transition_sounds(state)?;
+        self.ensemble.transition_to(state.sounds())?;
         self.transition_content(self.make_act_states(state))?;
-        Ok(())
-    }
-
-    fn transition_sounds(&mut self, state: &State) -> Result<(), Error> {
-        for (idx, sound) in self.sounds.iter_mut().enumerate() {
-            let done = sound.done().unwrap_or(true);
-
-            if state.sounds().contains(&idx) {
-                if done {
-                    // Activate sounds in the set that are currently inactive
-                    debug!("Starting sound: {:?}", self.sound_specs[idx].source());
-                    sound
-                        .activate()
-                        .unwrap_or_else(|e| warn!("Failed to activate sound: {}", e));
-                } else {
-                    // And keep the ones that are already playing
-                    debug!(
-                        "Keeping active sound on re-enter: {:?}",
-                        self.sound_specs[idx].source()
-                    );
-                }
-            } else if !done {
-                // Cancel sounds that are not in the new set
-                debug!("Stopping sound: {:?}", self.sound_specs[idx].source());
-                sound
-                    .cancel()
-                    .unwrap_or_else(|e| warn!("Failed to deactivate sound: {:?}", e));
-            }
-        }
-
         Ok(())
     }
 

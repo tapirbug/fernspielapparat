@@ -95,6 +95,7 @@ impl<'a> Machine<'a> {
             .expect("Failed to update actuators.");
 
         if self.current_actuators_done_time.is_none() && self.actuators.done() {
+            debug!("Actuators done: {:?}", self.current_state().name());
             self.current_actuators_done_time = Some(Instant::now());
         }
     }
@@ -114,11 +115,11 @@ impl<'a> Machine<'a> {
     fn enter(&mut self) {
         let state = &self.states[self.current_state_idx];
         let actuators = &mut self.actuators;
+
+        debug!("Will transition to: {}", state.name());
         actuators
             .transition_to(state)
             .expect("Entering state failed");
-
-        debug!("Transition to: {}", state.name());
 
         self.last_enter_time = Instant::now();
         self.current_actuators_done_time = None;
