@@ -5,6 +5,7 @@ extern crate ctrlc;
 extern crate cute_log;
 extern crate derivative;
 extern crate failure;
+#[cfg(target_os = "linux")]
 extern crate i2c_linux;
 extern crate log;
 extern crate serde;
