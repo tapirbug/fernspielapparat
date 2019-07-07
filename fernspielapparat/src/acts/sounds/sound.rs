@@ -1,4 +1,4 @@
-use super::{Player, ReenterBehavior, SoundSpec};
+use super::{Player, PlayerContext, ReenterBehavior, SoundSpec};
 use crate::acts::Act;
 use derivative::Derivative;
 use failure::Error;
@@ -21,9 +21,7 @@ pub struct Sound {
 }
 
 impl Sound {
-    pub fn from_spec(spec: &SoundSpec) -> Result<Self, Error> {
-        let player = Player::new(spec.source())?;
-
+    fn new(player: Player, spec: &SoundSpec) -> Result<Self, Error> {
         let sound = Self {
             player,
             spec: spec.clone(),
@@ -32,6 +30,17 @@ impl Sound {
         };
 
         Ok(sound)
+    }
+
+    #[cfg(test)]
+    pub fn from_spec(spec: &SoundSpec) -> Result<Self, Error> {
+        let player = Player::new(spec.source())?;
+        Self::new(player, spec)
+    }
+
+    pub fn from_spec_with_ctx(spec: &SoundSpec, ctx: &PlayerContext) -> Result<Self, Error> {
+        let player = Player::new_with_ctx(spec.source(), ctx)?;
+        Self::new(player, spec)
     }
 
     fn loop_or_deactivate_on_finish(&mut self) {
@@ -197,7 +206,7 @@ mod test {
 
         // when
         sound.activate().unwrap(); // start playing
-                                   // seek to the end by directly accesing the player field
+                                   // seek to the end by directly accessing the player field
                                    // effect should be the same as when waiting for that time
         sound.player.seek(duration - Duration::from_secs(1));
 

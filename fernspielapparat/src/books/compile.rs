@@ -228,10 +228,10 @@ mod book {
     #[cfg(test)]
     mod test {
         use super::*;
-        use tempfile::tempdir;
         use crate::books::file::load;
         use crate::books::spec::Id;
         use std::fs::read_dir;
+        use tempfile::tempdir;
 
         #[test]
         fn prepare_wav_files_from_default_yaml() {
@@ -252,7 +252,8 @@ mod book {
 
             // then
             assert_eq!(
-                temp_contents.count(), 1,
+                temp_contents.count(),
+                1,
                 "Expected exactly one generated file."
             );
         }

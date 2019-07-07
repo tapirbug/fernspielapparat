@@ -1,3 +1,4 @@
+use super::PlayerContext;
 use failure::{bail, format_err, Error};
 use log::warn;
 use std::cmp::min;
@@ -6,14 +7,13 @@ use std::path::Path;
 use std::sync::mpsc::channel;
 use std::time::Duration;
 use std::time::Instant;
-use vlc::{self, Instance, Media, MediaPlayer, State};
+use vlc::{self, Media, MediaPlayer, State};
 
 const READ_DURATION_TIMEOUT: Duration = Duration::from_secs(4);
 const PAUSE_DIRTY_TIMEOUT: Duration = Duration::from_millis(50);
 
 /// Responsible for playback of a single file.
 pub struct Player {
-    _instance: Instance,
     media: Media,
     player: MediaPlayer,
     duration: Duration,
@@ -25,16 +25,36 @@ pub struct Player {
     /// When trying to seek but the media is paused, caching it here.
     /// This also happens upon construction, seeking the start.
     pending_seek: Option<Duration>,
+    /// When player context is not managed by client code, keep it here
+    /// and free it when player is destroyed.
+    _ctx: Option<PlayerContext>,
 }
 
 impl Player {
+    /// Makes a new player that manages its own context.
+    /// Currently only used in tests.
+    ///
+    /// When multiple players exist at the same time, it
+    /// is more efficient to store the context outside the
+    /// player and pass it in when creating new players.
+    #[cfg(test)]
     pub fn new(file: impl AsRef<Path>) -> Result<Self, Error> {
-        let instance = Instance::new().ok_or_else(|| format_err!("Could not load libvlc"))?;
+        let ctx = PlayerContext::new()?;
+        Self::new_with_ctx(file, &ctx).map(|mut p| {
+            p.preserve_ctx(ctx);
+            p
+        })
+    }
 
-        let media = Media::new_path(&instance, file.as_ref())
+    /// Creates a new player with a caller-managed player
+    /// context.
+    pub fn new_with_ctx(file: impl AsRef<Path>, ctx: &PlayerContext) -> Result<Self, Error> {
+        let instance = ctx.vlc_instance();
+
+        let media = Media::new_path(instance, file.as_ref())
             .ok_or_else(|| format_err!("Could not load media {:?}", file.as_ref()))?;
 
-        let player = MediaPlayer::new(&instance)
+        let player = MediaPlayer::new(instance)
             .ok_or_else(|| format_err!("Could not load media {:?}", file.as_ref()))?;
 
         let (tx, rx) = channel::<Duration>();
@@ -57,13 +77,18 @@ impl Player {
         player.pause();
 
         Ok(Player {
-            _instance: instance,
             media,
             player,
             duration,
             last_pause_request: None,
             pending_seek: Some(Duration::from_micros(0)),
+            _ctx: None,
         })
+    }
+
+    #[cfg(test)]
+    fn preserve_ctx(&mut self, ctx: PlayerContext) {
+        self._ctx = Some(ctx);
     }
 
     fn ensure_media_set(&mut self) {

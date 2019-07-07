@@ -1,3 +1,4 @@
+use super::PlayerContext;
 use crate::acts::Act;
 use crate::acts::{Sound, SoundSpec};
 use crate::err::compound_result;
@@ -6,6 +7,8 @@ use failure::Error;
 /// Responsible for playing back multiple sounds at the same time
 /// and transitioning between them.
 pub struct Ensemble {
+    /// Shared resources of the sounds.
+    _player_ctx: PlayerContext,
     /// The spec that was used to create the sounds
     /// in the sound vector.
     ///
@@ -22,12 +25,17 @@ pub struct Ensemble {
 impl Ensemble {
     pub fn from_specs<'a, I: IntoIterator<Item = &'a SoundSpec>>(sounds: I) -> Result<Self, Error> {
         let specs = sounds.into_iter().cloned().collect::<Vec<SoundSpec>>();
+        let ctx = PlayerContext::new()?;
 
         specs
             .iter()
-            .map(Sound::from_spec)
+            .map(|s| Sound::from_spec_with_ctx(s, &ctx))
             .collect::<Result<Vec<_>, Error>>()
-            .map(|sounds| Ensemble { specs, sounds })
+            .map(|sounds| Ensemble {
+                _player_ctx: ctx,
+                specs,
+                sounds,
+            })
     }
 
     /// Activates all sounds at the given indexes and cancels all

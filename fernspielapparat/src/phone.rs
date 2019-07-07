@@ -61,7 +61,8 @@ mod linux {
         /// For a healthy connection, this should always
         /// return something, e.g. consecutive hangups.
         pub fn poll(&mut self) -> Result<Input> {
-            with_retries(self.retries, || self.i2c.smbus_read_byte_data(3)).and_then(Self::decode_input)
+            with_retries(self.retries, || self.i2c.smbus_read_byte_data(3))
+                .and_then(Self::decode_input)
         }
 
         pub fn ring(&mut self) -> Result<()> {
@@ -138,8 +139,8 @@ mod linux {
 /// is not linux, which is the only platform we support i2c for.
 #[cfg(not(target_os = "linux"))]
 mod mock {
-    use std::io::{Error, ErrorKind};
     use crate::senses::Input;
+    use std::io::{Error, ErrorKind};
 
     type Result<T> = std::result::Result<T, Error>;
 
@@ -148,12 +149,10 @@ mod mock {
 
     impl Phone {
         pub fn new() -> Result<Phone> {
-            Err(
-                Error::new(
-                    ErrorKind::NotFound,
-                    "I2C phone is not supported on this platform."
-                )
-            )
+            Err(Error::new(
+                ErrorKind::NotFound,
+                "I2C phone is not supported on this platform.",
+            ))
         }
 
         pub fn poll(&mut self) -> Result<Input> {
