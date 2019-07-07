@@ -1,4 +1,4 @@
-# Fernspielapparat
+# fernspielapparat
 Documentation and code of the _Fernspielapparat_ project live here.
 
 It is a story telling device and you can learn more about what it
