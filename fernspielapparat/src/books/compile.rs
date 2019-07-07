@@ -228,22 +228,33 @@ mod book {
     #[cfg(test)]
     mod test {
         use super::*;
+        use tempfile::tempdir;
+        use crate::books::file::load;
+        use crate::books::spec::Id;
+        use std::fs::read_dir;
 
         #[test]
         fn prepare_wav_files_from_default_yaml() {
-            use crate::books::file::load;
-            use crate::books::spec::Id;
+            // given
+            let tempdir = tempdir().expect("could not create temporary directory");
+
+            // when
             let mut petrov_book = load("./resources/demo.yaml").unwrap();
             let missiles_launched_opt = petrov_book.sounds.get_mut(&Id::new("missiles_launched"));
             match missiles_launched_opt {
                 Some(sound_spec) => {
                     assert!(sound_spec.speech.is_some());
-                    BookBuilder::prepare_sound(sound_spec, Path::new("/home/krachzack")).unwrap();
+                    BookBuilder::prepare_sound(sound_spec, tempdir.path()).unwrap();
                 }
                 _ => panic!("Could not load demo file"),
             }
+            let temp_contents = read_dir(tempdir.path()).unwrap();
 
-            //
+            // then
+            assert_eq!(
+                temp_contents.count(), 1,
+                "Expected exactly one generated file."
+            );
         }
     }
 }
