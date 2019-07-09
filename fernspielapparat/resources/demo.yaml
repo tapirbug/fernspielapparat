@@ -23,7 +23,6 @@ states:
     sounds:
       - interrupted
   hung_up:
-    terminal: true
   
 initial: ring
 
