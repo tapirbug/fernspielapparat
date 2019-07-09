@@ -61,7 +61,7 @@ mod linux {
         /// For a healthy connection, this should always
         /// return something, e.g. consecutive hangups.
         pub fn poll(&mut self) -> Result<Input> {
-            with_retries(self.retries, || self.i2c.smbus_read_byte_data(3))
+            with_retries(self.retries, || self.i2c.smbus_read_byte())
                 .and_then(Self::decode_input)
         }
 
@@ -81,7 +81,7 @@ mod linux {
 
         fn send(&mut self, msg: Msg) -> Result<()> {
             with_retries(self.retries, || {
-                self.i2c.smbus_read_byte_data(msg.as_u8())?;
+                self.i2c.smbus_write_byte_data(msg.as_u8(), msg.as_u8())?;
                 Ok(())
             })
         }
