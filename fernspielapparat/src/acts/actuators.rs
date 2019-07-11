@@ -97,10 +97,16 @@ impl Actuators {
     }
 
     pub fn transition_content(&mut self, next_acts: Vec<Box<dyn Act>>) -> Result<(), Error> {
+        // replace self.active with new
         if let Err(errs) = cancel_all(&mut replace(&mut self.active, next_acts)) {
             warn!("Some acts could not be cancelled: {}", errs);
         };
-        Ok(())
+
+        // and activate replaced contents
+        compound_result(
+            self.active.iter_mut()
+                .map(|a| (*a).activate())
+        )
     }
 }
 
