@@ -6,15 +6,14 @@ use std::sync::{Arc, Mutex};
 
 pub struct HardwareDial {
     phone: Arc<Mutex<Phone>>,
-    last_input: Input,
+    last_input: Option<Input>,
 }
 
 impl HardwareDial {
     pub fn new(phone: &Arc<Mutex<Phone>>) -> Self {
         HardwareDial {
             phone: Arc::clone(phone),
-            // Ignore initial hung up, if starting hung up
-            last_input: Input::hang_up(),
+            last_input: None,
         }
     }
 
@@ -36,14 +35,14 @@ impl HardwareDial {
     /// hangups and pickups if no input was done.
     ///
     /// Consolidate these duplicate inputs.
-    pub fn combine_with_old(&mut self, new_input: Input) -> Result<Input, Error> {
+    fn combine_with_old(&mut self, new_input: Input) -> Result<Input, Error> {
         let combined = match (self.last_input, new_input) {
-            (Input::PickUp, Input::PickUp) => Err(Error::WouldBlock),
-            (Input::HangUp, Input::HangUp) => Err(Error::WouldBlock),
+            (Some(Input::PickUp), Input::PickUp) => Err(Error::WouldBlock),
+            (Some(Input::HangUp), Input::HangUp) => Err(Error::WouldBlock),
             _ => Ok(new_input),
         };
 
-        self.last_input = new_input;
+        self.last_input = Some(new_input);
 
         combined
     }
