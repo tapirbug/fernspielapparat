@@ -28,6 +28,11 @@ impl Actuators {
         Ok(actuators)
     }
 
+    /// Sets all actuators back into the initial state.
+    pub fn reset(&mut self) -> Result<(), Error> {
+        self.ensemble.reset()
+    }
+
     pub fn update(&mut self) -> Result<(), Error> {
         // First give every act a chance to update
         let update_errs: Vec<_> = self
@@ -96,7 +101,7 @@ impl Actuators {
         acts
     }
 
-    pub fn transition_content(&mut self, next_acts: Vec<Box<dyn Act>>) -> Result<(), Error> {
+    fn transition_content(&mut self, next_acts: Vec<Box<dyn Act>>) -> Result<(), Error> {
         // replace self.active with new
         if let Err(errs) = cancel_all(&mut replace(&mut self.active, next_acts)) {
             warn!("Some acts could not be cancelled: {}", errs);

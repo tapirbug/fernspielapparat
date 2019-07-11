@@ -38,6 +38,14 @@ impl Ensemble {
             })
     }
 
+    /// Rewinds and stops all sounds.
+    pub fn reset(&mut self) -> Result<(), Error> {
+        compound_result(
+            self.sounds.iter_mut()
+                .map(Sound::reset)
+        )
+    }
+
     /// Activates all sounds at the given indexes and cancels all
     /// others.
     ///

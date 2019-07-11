@@ -43,6 +43,17 @@ impl Sound {
         Self::new(player, spec)
     }
 
+    /// Sets everything back to the initial state.
+    /// 
+    /// Stops and rewinds the player.
+    pub fn reset(&mut self) -> Result<(), Error> {
+        self.player.rewind();
+        self.player.pause()?;
+        self.activated = false;
+        self.never_activated = true;
+        Ok(())
+    }
+
     fn loop_or_deactivate_on_finish(&mut self) {
         if let Ok(false) = self.player.playing() {
             if self.spec.is_loop() && self.activated {
