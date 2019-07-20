@@ -75,7 +75,10 @@ mod book {
         /// The content file is then set to the given spec and its
         /// speech text is removed.spec
         fn prepare_sound(sound: &mut spec::Sound, cache_directory: &Path) -> Result<(), Error> {
-            if let Some(mut text) = sound.speech.take() {
+            // Files take precedence over speech
+            if sound.file.is_empty() && sound.speech.is_some() {
+                let mut text = sound.speech.take().unwrap(); // Checked if some, unwrap is safe
+
                 if text.len() > Self::MAX_TEXT_LEN {
                     shrink_to_max(&mut text, Self::MAX_TEXT_LEN);
                 }
