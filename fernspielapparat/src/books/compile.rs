@@ -25,23 +25,35 @@ mod book {
 
     const KIB: usize = 1024;
 
+    #[derive(Debug)]
     pub struct Book {
         pub(crate) states: Vec<State>,
         sounds: Vec<SoundSpec>,
-        /// Get deleted when book is destroyed
-        compiled_speech_dir: TempDir,
+        /// Directory for generated sounds, e.g. from espeak.
+        /// Gets deleted when book is destroyed.
+        /// Only created when sound is generated, otherwise `None`.
+        compiled_speech_dir: Option<TempDir>,
     }
 
     impl Book {
-        pub fn builder() -> Result<BookBuilder, Error> {
-            let builder = BookBuilder {
+        pub fn builder() -> BookBuilder {
+            BookBuilder {
                 book: Book {
                     states: vec![],
                     sounds: vec![],
-                    compiled_speech_dir: tempdir()?,
+                    compiled_speech_dir: None,
                 },
-            };
-            Ok(builder)
+            }
+        }
+
+        /// Returns a phonebook where the initial state
+        /// is also the final state and does nothing.
+        pub fn passive() -> Self {
+            Book {
+                states: vec![State::builder().name("passive").terminal(true).build()],
+                sounds: vec![],
+                compiled_speech_dir: None,
+            }
         }
 
         pub fn states(&self) -> &[State] {
@@ -155,7 +167,8 @@ mod book {
         }
 
         pub fn sound(&mut self, mut sound: spec::Sound) -> Result<&mut Self, Error> {
-            let cache_directory: &Path = self.book.compiled_speech_dir.as_ref();
+            let cache_directory = self.compiled_speech_dir()?;
+
             Self::prepare_sound(&mut sound, cache_directory)?;
             let path = sound.file.clone();
 
@@ -174,6 +187,20 @@ mod book {
             });
 
             Ok(self)
+        }
+
+        fn compiled_speech_dir(&mut self) -> Result<&Path, Error> {
+            if self.book.compiled_speech_dir.is_none() {
+                // temp dir is need but not yet created, do it
+                self.book.compiled_speech_dir = Some(tempdir()?);
+            }
+
+            Ok(self
+                .book
+                .compiled_speech_dir
+                .as_ref()
+                .unwrap() // safe: either was already there or just created
+                .as_ref())
         }
 
         pub fn build(self) -> Book {
@@ -269,7 +296,7 @@ mod book {
 /// This also prepares espeak speech into WAV files
 /// in a temporary directory.
 pub fn compile(book: spec::Book) -> Result<Book, Error> {
-    let mut builder = Book::builder()?;
+    let mut builder = Book::builder();
 
     let spec::Book {
         states,
@@ -421,8 +448,7 @@ fn compile_ring(state: StateBuilder, ring: f64) -> StateBuilder {
 }
 
 fn compile_timeout(state: StateBuilder, after: f64, to: usize) -> Result<StateBuilder, Error> {
-    to_duration(after)
-        .map(|dur| state.timeout(dur, to))
+    to_duration(after).map(|dur| state.timeout(dur, to))
 }
 
 fn with_any(base: &Transitions, any: &Transitions) -> Transitions {

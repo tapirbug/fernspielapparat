@@ -45,9 +45,9 @@ mod linux {
     }
 
     impl Phone {
-        pub fn new() -> Result<Self> {
-            let mut i2c = I2c::from_path("/dev/i2c-1")?;
-            i2c.smbus_set_slave_address(4, false)?;
+        pub fn connect(i2c_device: &str, address: u16) -> Result<Self> {
+            let mut i2c = I2c::from_path(i2c_device)?;
+            i2c.smbus_set_slave_address(address, false)?;
 
             Ok(Phone {
                 i2c,
@@ -61,8 +61,7 @@ mod linux {
         /// For a healthy connection, this should always
         /// return something, e.g. consecutive hangups.
         pub fn poll(&mut self) -> Result<Input> {
-            with_retries(self.retries, || self.i2c.smbus_read_byte())
-                .and_then(Self::decode_input)
+            with_retries(self.retries, || self.i2c.smbus_read_byte()).and_then(Self::decode_input)
         }
 
         pub fn ring(&mut self) -> Result<()> {

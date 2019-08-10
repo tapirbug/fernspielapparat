@@ -8,8 +8,16 @@ use log::error;
 pub struct Sensors(Vec<Box<dyn Sense>>);
 
 impl Sensors {
+    /// Creates a builder for sensors, where background
+    /// senses can be added and are evaluated in their
+    /// own threads.
     pub fn builder() -> Builder {
         Builder::new()
+    }
+
+    /// Sensors where polled input is always `None`.
+    pub fn blind() -> Self {
+        Sensors(vec![])
     }
 
     /// Polls all sensors and exits early if input has

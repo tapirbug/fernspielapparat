@@ -44,7 +44,7 @@ impl Sound {
     }
 
     /// Sets everything back to the initial state.
-    /// 
+    ///
     /// Stops and rewinds the player.
     pub fn reset(&mut self) -> Result<(), Error> {
         self.player.rewind();
@@ -204,7 +204,7 @@ mod test {
 
     #[test]
     fn rewind_on_reenter_when_fully_played() {
-        crate::testutil::enable_logging();
+        crate::log::init_test_logging();
 
         // given
         let mut sound = Sound::from_spec(
@@ -266,7 +266,7 @@ mod test {
 
     #[test]
     fn backoff_on_reenter_for_non_looping_clamp_at_start_offset() {
-        crate::testutil::enable_logging();
+        crate::log::init_test_logging();
 
         // given
         let mut sound = Sound::from_spec(
@@ -331,7 +331,7 @@ mod test {
 
     #[test]
     fn backoff_on_reenter_for_non_looping() {
-        crate::testutil::enable_logging();
+        crate::log::init_test_logging();
 
         // given
         let mut sound = Sound::from_spec(

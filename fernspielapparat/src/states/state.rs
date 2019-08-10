@@ -3,7 +3,7 @@ pub use builder::StateBuilder;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct State {
     /// Name of this state, not guaranteed to be unique.
     name: String,
@@ -25,7 +25,7 @@ pub struct State {
 
 impl State {
     pub fn builder() -> StateBuilder {
-        StateBuilder::new()
+        Default::default()
     }
 
     pub fn name(&self) -> &str {
@@ -74,17 +74,12 @@ impl State {
 mod builder {
     use super::{Duration, Input, State};
 
+    #[derive(Default)]
     pub struct StateBuilder {
         state: State,
     }
 
     impl StateBuilder {
-        pub fn new() -> Self {
-            StateBuilder {
-                state: Default::default(),
-            }
-        }
-
         pub fn name(mut self, name: impl Into<String>) -> Self {
             self.state.name = name.into();
             self

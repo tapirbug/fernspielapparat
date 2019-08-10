@@ -1,48 +1,27 @@
-extern crate base64;
-extern crate clap;
-extern crate crossbeam_channel;
-extern crate ctrlc;
-extern crate cute_log;
-extern crate derivative;
-extern crate failure;
-#[cfg(target_os = "linux")]
-extern crate i2c_linux;
-extern crate log;
-extern crate serde;
-extern crate serde_yaml;
-extern crate tavla;
-extern crate tempfile;
-extern crate vlc;
-
-#[cfg(test)]
-extern crate env_logger;
-#[cfg(test)]
-mod testutil;
-
-mod acts;
-mod books;
-mod err;
-mod phone;
-mod senses;
-mod states;
-mod util;
-
-use crate::acts::Actuators;
-use crate::books::Book;
-use crate::phone::Phone;
-use crate::senses::init_sensors;
-use crate::states::Machine;
-use clap::{crate_authors, crate_name, crate_version, App, Arg};
+//! Parses command line arguments and sets the ball rolling by building
+//! and launching the `App`, setting it up so it gracefully returns on
+//! ctrl+c.
+//!
+//! Handles exit codes based on whether the `App` produced an error when
+//! run.
+//!
+//! Calls into the respective modules to set up logging and ensures fatal
+//! errors are being logged.
+//!
+//! Also provides CLI access to the hardware check.
+use clap::{self, crate_authors, crate_name, crate_version, Arg, ArgMatches};
 use failure::Error;
-use log::{debug, error, info, warn, LevelFilter};
-use std::process::exit;
-use std::sync::{
-    atomic::{AtomicBool, Ordering::SeqCst},
-    Arc, Mutex,
+use fernspielapparat::{
+    books,
+    check::check_system,
+    log::{init_logging, log_fatal},
+    App,
 };
-use std::thread::sleep;
-use std::time::Duration;
-use tavla::{Speech, Voice};
+use log::{debug, info, warn};
+use std::process::exit;
+
+/// When `--serve` is used without a bind point, use this.
+const DEFAULT_BIND_ADDRESS: &str = "127.0.0.1:38397";
 
 fn main() {
     if bootstrap().is_err() {
@@ -51,7 +30,7 @@ fn main() {
 }
 
 fn bootstrap() -> Result<(), Error> {
-    let matches = App::new(crate_name!())
+    let matches = clap::App::new(crate_name!())
         .version(crate_version!())
         .about("Runtime environment for fernspielapparat phonebooks.")
         .author(crate_authors!())
@@ -60,13 +39,35 @@ fn bootstrap() -> Result<(), Error> {
                 .help("Path to the phone book to use")
                 .required(true)
                 .conflicts_with("demo")
-                .conflicts_with("test"),
+                .conflicts_with("test")
+                .conflicts_with("serve"),
+        )
+        .arg(
+            Arg::with_name("serve")
+                .short("s")
+                .long("serve")
+                .takes_value(true)
+                .default_value(DEFAULT_BIND_ADDRESS)
+                .value_name("HOSTNAME_AND_PORT")
+                .hide_default_value(true)
+                .help(&format!(
+                    "Starts up a WebSockets server for remote control on the \
+                     specified hostname and port, or \"{default}\" if no value specified.",
+                    default = DEFAULT_BIND_ADDRESS
+                )),
         )
         .arg(
             Arg::with_name("demo")
                 .short("d")
                 .long("demo")
                 .help("Loads a demo phonebook instead of a file"),
+        )
+        .arg(
+            Arg::with_name("exit-on-terminal")
+                .long("exit-on-terminal")
+                .help(
+                    "Instead of starting over, exit with status 0 when reaching a terminal state.",
+                ),
         )
         .arg(Arg::with_name("test").short("t").long("test").help(
             "Lets the phone ring and speak for one second as a basic hardware \
@@ -87,6 +88,7 @@ fn bootstrap() -> Result<(), Error> {
                 .conflicts_with("quiet"),
         )
         .get_matches();
+
     let verbosity_level = if matches.is_present("quiet") {
         None
     } else {
@@ -95,137 +97,56 @@ fn bootstrap() -> Result<(), Error> {
     init_logging(verbosity_level);
 
     if matches.is_present("test") {
-        let check_result = check_phone().and(check_speech());
-
-        if check_result.is_ok() {
-            info!("Systems check successful.");
-        } else {
-            error!("Systems check failure.");
-        }
-
-        check_result
+        check_system()
     } else {
-        let phonebook = if matches.is_present("demo") {
-            books::from_str(include_str!("../resources/demo.yaml"))
-        } else {
-            books::from_path(matches.value_of("phonebook").unwrap())
-        };
-
-        let result = phonebook.and_then(launch);
+        let result = build_app(matches).and_then(|mut a| {
+            debug!("initialization complete, starting");
+            a.run()
+        });
 
         match result {
             Ok(_) => debug!("Exiting after normal operation."),
-            Err(ref err) => log_error(err),
+            Err(ref err) => log_fatal(err),
         }
+
         result
     }
 }
 
-fn launch(book: Book) -> Result<(), Error> {
-    let termination_requested = listen_for_termination_signal();
-    let phone = Phone::new().ok().map(|p| Arc::new(Mutex::new(p)));
+fn build_app(matches: ArgMatches) -> Result<App, Error> {
+    let mut app = App::builder();
 
-    if phone.is_some() {
-        info!("Phone connected, starting normal operation.");
+    if matches.is_present("demo") || matches.is_present("phonebook") {
+        app.startup_phonebook(if matches.is_present("demo") {
+            books::from_str(include_str!("../resources/demo.yaml"))?
+        } else {
+            books::from_path(matches.value_of("phonebook").unwrap_or(""))?
+        });
+    }
+
+    app.terminate_on_ctrlc_and_sigterm();
+
+    if matches.is_present("exit-on-terminal") {
+        app.exit_on_terminal_state();
     } else {
-        warn!("No phone available.");
+        app.rewind_on_terminal_state();
     }
 
-    let sensors = init_sensors(&phone);
-    let actuators = Actuators::new(&phone, book.sounds())?;
-    let mut machine = Machine::new(sensors, actuators, book.states());
-
-    while !termination_requested.load(SeqCst) && machine.update() {
-        sleep(Duration::from_millis(10));
+    match app.phone("/dev/i2c-1", 4) {
+        Ok(_) => info!("phone connected on dev/i2c-1, address 4."),
+        Err(e) => warn!("no phone available, error: {}", e),
     }
 
-    Ok(())
-}
+    if matches.occurrences_of("serve") > 0 {
+        let bind_to = matches
+            .value_of("serve")
+            // unwrap is safe: 127.0.0.1:38397 is specified as default value
+            .unwrap();
 
-fn listen_for_termination_signal() -> Arc<AtomicBool> {
-    let termination_requested = Arc::new(AtomicBool::new(false));
+        debug!("starting WebSockets remote control server on {}", bind_to);
 
-    let termination_requested_handler_reference = Arc::clone(&termination_requested);
-    let result = ctrlc::set_handler(move || {
-        termination_requested_handler_reference.store(true, SeqCst);
-    });
-
-    if let Err(e) = result {
-        warn!(
-            "Failed to set up signal handler for safe termination. \
-             The phone may keep ringing after termination. \
-             Error: {:?}",
-            e
-        )
+        app.serve(bind_to)?;
     }
 
-    termination_requested
-}
-
-fn log_error(error: &Error) {
-    error!("Exiting due to fatal error.");
-    debug!("Backtrace: {}", error.backtrace());
-
-    for cause in error.iter_chain() {
-        error!("Cause: {}", cause);
-        debug!("Cause: {:?}", cause);
-    }
-}
-
-fn check_phone() -> Result<(), Error> {
-    info!("Testing communication with hardware phone...");
-
-    let test_result = Phone::new().and_then(|mut phone| {
-        phone.ring()?;
-        sleep(Duration::from_secs(1));
-        phone.unring()?;
-        Ok(())
-    });
-
-    match test_result {
-        Ok(_) => info!("Hardware phone ok."),
-        Err(ref e) => {
-            error!("Communication with hardware phone failed: {}.", e);
-        }
-    }
-
-    Ok(test_result?)
-}
-
-fn check_speech() -> Result<(), Error> {
-    info!("Testing speech synthesizer...");
-
-    let test_result = tavla::any_voice().and_then(|v| {
-        Ok(v.speak("This is fernspielapparat speaking.")?
-            .await_done()?)
-    });
-
-    match test_result {
-        Ok(_) => {
-            info!("Speech synthesis ok.");
-            Ok(())
-        }
-        Err(e) => {
-            error!("Speech synthesis failed: {}.", e);
-            Err(e)
-        }
-    }
-}
-
-fn init_logging(verbosity_level: Option<u64>) {
-    let level = match verbosity_level {
-        None => LevelFilter::Off,
-        Some(0) => LevelFilter::Warn,
-        Some(1) => LevelFilter::Info,
-        Some(2) => LevelFilter::Debug,
-        _ => LevelFilter::Trace,
-    };
-
-    let res = cute_log::init_with_max_level(level);
-    if let Err(err) = res {
-        eprintln!(
-            "Failed to initialize logging. Will stay silent for the rest of execution. Error: {}",
-            err
-        )
-    }
+    Ok(app.build()?)
 }

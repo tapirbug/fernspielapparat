@@ -1,17 +1,20 @@
 use crate::acts::Actuators;
 use crate::senses::Sensors;
 use crate::states::State;
-use log::{error, debug};
-use std::time::Instant;
+
 use failure::Error;
+use log::{debug, error};
+
+use std::mem::replace;
+use std::time::Instant;
 
 type Result<T> = std::result::Result<T, Error>;
 
 /// A state machine modelled after a mealy machine.
-pub struct Machine<'a> {
+pub struct Machine {
     sensors: Sensors,
     actuators: Actuators,
-    states: &'a [State],
+    states: Vec<State>,
     current_state_idx: usize,
     /// The time of the last transition and initially the startup time.
     last_enter_time: Instant,
@@ -20,25 +23,54 @@ pub struct Machine<'a> {
     current_actuators_done_time: Option<Instant>,
 }
 
-impl<'a> Machine<'a> {
-    pub fn new(sensors: Sensors, actuators: Actuators, states: &'a [State]) -> Self {
-        assert!(!states.is_empty(), "Expected at least one state");
-
+impl Machine {
+    pub fn new(sensors: Sensors, actuators: Actuators, states: &[State]) -> Self {
         let now = Instant::now();
         let mut machine = Machine {
             sensors,
             actuators,
-            states,
+            states: states.to_vec(),
             current_state_idx: 0,
             last_enter_time: now,
             current_actuators_done_time: None,
         };
+        machine.init();
+        machine
+    }
 
-        if let Err(err) = machine.enter() {
+    fn init(&mut self) {
+        assert!(!self.states.is_empty(), "Expected at least one state");
+
+        self.reset(); // some redundant work on first init, but needed on load
+        if let Err(err) = self.enter() {
             error!("Failed to enter initial state: {}", err);
         }
+    }
 
-        machine
+    /// Terminates this machine and returns a new machine with the
+    /// given actuators and states, re-using the sensors that were
+    /// used by the terminated machine.
+    pub fn load(&mut self, actuators: Actuators, states: &[State]) {
+        // hack: temporarily set dummy sensors and move the real ones out
+        let sensors = replace(&mut self.sensors, Sensors::blind());
+
+        // Then overwrite self with newly initialized machine,
+        // re-using the old sensors
+        *self = Machine::new(sensors, actuators, states);
+    }
+
+    pub fn reset(&mut self) {
+        self.current_state_idx = 0;
+        self.last_enter_time = Instant::now();
+        self.current_actuators_done_time = None;
+        self.actuators.reset().unwrap_or_else(|e| {
+            error!("failed to reset actuaotrs, continuing to run, error: {}", e)
+        });
+        // sensors cannot be reset
+
+        if let Err(err) = self.enter() {
+            error!("Failed enter initial state after reset: {}", err);
+        }
     }
 
     /// Starts the next cycle of the machine, first polling
@@ -117,7 +149,7 @@ impl<'a> Machine<'a> {
     }
 
     /// `true`, if a terminal state has been reached.
-    fn is_terminal(&self) -> bool {
+    pub fn is_terminal(&self) -> bool {
         self.current_state().is_terminal()
     }
 
@@ -136,8 +168,7 @@ impl<'a> Machine<'a> {
         let actuators = &mut self.actuators;
 
         debug!("Will transition to: {}", state.name());
-        actuators
-            .transition_to(state)?;
+        actuators.transition_to(state)?;
 
         self.last_enter_time = Instant::now();
         self.current_actuators_done_time = None;
@@ -203,8 +234,9 @@ mod test {
     }
 
     #[test]
-    //#[ignore]
     fn timeout_starts_after_speech() {
+        const TOLERANCE: Duration = Duration::from_millis(150);
+
         let text = ".........";
         let speech_time = actual_speech_time(text);
         let timeout = Duration::from_millis(220);
@@ -222,10 +254,11 @@ mod test {
         ]);
 
         let error = delta(test_duration, expected_duration);
-        let tolerance = Duration::from_millis(50);
         assert!(
-            error <= tolerance,
-            "Timeout was more than 50ms off from expected time"
+            error <= TOLERANCE,
+            "Timeout was more than {tolerance:?} off from expected time. Off by {error:?}.",
+            tolerance = TOLERANCE,
+            error = error
         );
     }
 

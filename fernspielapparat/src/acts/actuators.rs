@@ -108,10 +108,7 @@ impl Actuators {
         };
 
         // and activate replaced contents
-        compound_result(
-            self.active.iter_mut()
-                .map(|a| (*a).activate())
-        )
+        compound_result(self.active.iter_mut().map(|a| (*a).activate()))
     }
 }
 

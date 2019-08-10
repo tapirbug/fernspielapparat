@@ -37,5 +37,4 @@ mod test {
             assert!(act.done().unwrap());
         }
     }
-
 }
