@@ -25,6 +25,7 @@ mod err;
 mod phone;
 mod senses;
 mod states;
+mod util;
 
 use crate::acts::Actuators;
 use crate::books::Book;

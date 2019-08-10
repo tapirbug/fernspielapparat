@@ -1,6 +1,7 @@
 use crate::books::spec;
 use crate::senses::Input;
 use crate::states::{State, StateBuilder};
+use crate::util::time::to_duration;
 pub use book::Book;
 use failure::{bail, format_err, Error};
 use log::warn;
@@ -363,7 +364,7 @@ fn compile_state(
 
     if let Some(ref timeout) = transitions.timeout {
         state = lookup_state(defined_states, &timeout.to)
-            .map(|idx| compile_timeout(state, timeout.after, idx))?
+            .and_then(|idx| compile_timeout(state, timeout.after, idx))?
     }
 
     for (dial_pattern, target_id) in transitions.dial.iter() {
@@ -419,9 +420,9 @@ fn compile_ring(state: StateBuilder, ring: f64) -> StateBuilder {
     }
 }
 
-fn compile_timeout(state: StateBuilder, after: f64, to: usize) -> StateBuilder {
-    let ms = (after * 1000.0) as u64;
-    state.timeout(Duration::from_millis(ms), to)
+fn compile_timeout(state: StateBuilder, after: f64, to: usize) -> Result<StateBuilder, Error> {
+    to_duration(after)
+        .map(|dur| state.timeout(dur, to))
 }
 
 fn with_any(base: &Transitions, any: &Transitions) -> Transitions {
