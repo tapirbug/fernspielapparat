@@ -1,5 +1,6 @@
 use crate::acts::{Act, Ensemble, Ring, SoundSpec, Wait};
 use crate::err::compound_result;
+use crate::evt::{Event, Responder, ResponderState};
 use crate::phone::Phone;
 use crate::states::State;
 use failure::Error;
@@ -8,6 +9,8 @@ use std::mem::replace;
 use std::sync::{Arc, Mutex, PoisonError};
 use tavla::{any_voice, Voice};
 
+type Result<T> = std::result::Result<T, Error>;
+
 pub struct Actuators {
     active: Vec<Box<dyn Act>>,
     phone: Option<Arc<Mutex<Phone>>>,
@@ -15,10 +18,7 @@ pub struct Actuators {
 }
 
 impl Actuators {
-    pub fn new(
-        phone: &Option<Arc<Mutex<Phone>>>,
-        sound_specs: &[SoundSpec],
-    ) -> Result<Self, Error> {
+    pub fn new(phone: &Option<Arc<Mutex<Phone>>>, sound_specs: &[SoundSpec]) -> Result<Self> {
         let actuators = Actuators {
             active: vec![],
             ensemble: Ensemble::from_specs(sound_specs)?,
@@ -29,11 +29,11 @@ impl Actuators {
     }
 
     /// Sets all actuators back into the initial state.
-    pub fn reset(&mut self) -> Result<(), Error> {
+    pub fn reset(&mut self) -> Result<()> {
         self.ensemble.reset()
     }
 
-    pub fn update(&mut self) -> Result<(), Error> {
+    fn do_update(&mut self) -> Result<()> {
         // First give every act a chance to update
         let update_errs: Vec<_> = self
             .active
@@ -69,7 +69,7 @@ impl Actuators {
         self.active.is_empty() && self.ensemble.non_loop_sounds_idle()
     }
 
-    pub fn transition_to(&mut self, state: &State) -> Result<(), Error> {
+    pub fn transition_to(&mut self, state: &State) -> Result<()> {
         self.ensemble.transition_to(state.sounds())?;
         self.transition_content(self.make_act_states(state))?;
         Ok(())
@@ -101,7 +101,7 @@ impl Actuators {
         acts
     }
 
-    fn transition_content(&mut self, next_acts: Vec<Box<dyn Act>>) -> Result<(), Error> {
+    fn transition_content(&mut self, next_acts: Vec<Box<dyn Act>>) -> Result<()> {
         // replace self.active with new
         if let Err(errs) = cancel_all(&mut replace(&mut self.active, next_acts)) {
             warn!("Some acts could not be cancelled: {}", errs);
@@ -112,7 +112,7 @@ impl Actuators {
     }
 }
 
-fn cancel_all(acts: &mut Vec<Box<dyn Act>>) -> Result<(), Error> {
+fn cancel_all(acts: &mut Vec<Box<dyn Act>>) -> Result<()> {
     compound_result(acts.iter_mut().map(|a| (*a).cancel()))
 }
 
@@ -132,5 +132,67 @@ impl Drop for Actuators {
                 .unring()
                 .unwrap_or_else(|e| warn!("Failed to unring phone at shutdown: {}", e));
         }
+    }
+}
+
+impl Responder<State> for Actuators {
+    fn respond(&mut self, event: &Event<State>) -> Result<()> {
+        match event {
+            Event::Start { initial } => {
+                self.reset()?;
+                self.transition_to(initial)
+            }
+            Event::Transition { to, .. } => self.transition_to(to),
+            // don't care about non-transition events
+            _ => Ok(()),
+        }
+    }
+
+    fn update(&mut self) -> Result<ResponderState> {
+        self.do_update()?;
+        Ok(if self.done() {
+            ResponderState::Idle
+        } else {
+            ResponderState::Running
+        })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::testutil::assert_duration;
+    use std::thread::yield_now;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn responder_state_changes_to_idle_when_ring_finished() {
+        // given
+        crate::log::init_test_logging();
+        let mut actuators = Actuators::new(&None, &[]).expect("could not create actuators");
+        let ring_duration = Duration::from_millis(300);
+        let timeout_state = &State::builder().ring_for(ring_duration).build();
+        let start_at_timeout_state = Event::Start {
+            initial: timeout_state,
+        };
+
+        // when
+        let time_before = Instant::now();
+
+        actuators
+            .respond(&start_at_timeout_state)
+            .expect("failed to respond");
+
+        while let ResponderState::Running = actuators.update().unwrap() {
+            yield_now();
+        }
+        let state_after = actuators.update().unwrap();
+
+        let time_after = Instant::now();
+
+        // then
+        let actual_duration = time_after.duration_since(time_before);
+        assert_duration("ring duration", ring_duration, actual_duration);
+        assert_eq!(state_after, ResponderState::Idle);
     }
 }

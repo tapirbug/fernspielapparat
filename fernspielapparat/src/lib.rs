@@ -9,6 +9,7 @@ mod testutil;
 
 mod acts;
 mod err;
+mod evt;
 mod phone;
 mod senses;
 mod serve;
@@ -19,5 +20,6 @@ pub mod app;
 pub mod books;
 pub mod check;
 pub mod log;
+
 pub use app::{App, Builder as AppBuilder};
 pub use phone::Phone;

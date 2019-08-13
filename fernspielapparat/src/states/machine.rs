@@ -1,4 +1,4 @@
-use crate::acts::Actuators;
+use crate::evt::{Event, Responder, ResponderState};
 use crate::senses::Sensors;
 use crate::states::State;
 
@@ -11,28 +11,31 @@ use std::time::Instant;
 type Result<T> = std::result::Result<T, Error>;
 
 /// A state machine modelled after a mealy machine.
-pub struct Machine {
+pub struct Machine<R> {
     sensors: Sensors,
-    actuators: Actuators,
+    responder: R,
     states: Vec<State>,
     current_state_idx: usize,
     /// The time of the last transition and initially the startup time.
     last_enter_time: Instant,
+    last_responder_state: ResponderState,
     /// Time when it was first detected that all actuators such as speech
     /// are finished. `None` if some actuator is still working.
-    current_actuators_done_time: Option<Instant>,
+    responder_done_time: Option<Instant>,
 }
 
-impl Machine {
-    pub fn new(sensors: Sensors, actuators: Actuators, states: &[State]) -> Self {
+impl<R: Responder<State>> Machine<R> {
+    pub fn new(sensors: Sensors, responder: R, states: &[State]) -> Self {
         let now = Instant::now();
         let mut machine = Machine {
             sensors,
-            actuators,
+            responder,
             states: states.to_vec(),
             current_state_idx: 0,
             last_enter_time: now,
-            current_actuators_done_time: None,
+            // consider running until end of first update
+            last_responder_state: ResponderState::Running,
+            responder_done_time: None,
         };
         machine.init();
         machine
@@ -48,24 +51,35 @@ impl Machine {
     }
 
     /// Terminates this machine and returns a new machine with the
-    /// given actuators and states, re-using the sensors that were
+    /// given responder and states, re-using the sensors that were
     /// used by the terminated machine.
-    pub fn load(&mut self, actuators: Actuators, states: &[State]) {
+    pub fn load(&mut self, responder: R, states: &[State]) {
         // hack: temporarily set dummy sensors and move the real ones out
         let sensors = replace(&mut self.sensors, Sensors::blind());
 
         // Then overwrite self with newly initialized machine,
         // re-using the old sensors
-        *self = Machine::new(sensors, actuators, states);
+        *self = Machine::new(sensors, responder, states);
     }
 
     pub fn reset(&mut self) {
         self.current_state_idx = 0;
         self.last_enter_time = Instant::now();
-        self.current_actuators_done_time = None;
-        self.actuators.reset().unwrap_or_else(|e| {
-            error!("failed to reset actuaotrs, continuing to run, error: {}", e)
-        });
+        self.responder_done_time = None;
+        // consider running until end of first update after reset
+        self.last_responder_state = ResponderState::Running;
+
+        // let actuators react to reset or load
+        let initial = &self.states[self.current_state_idx];
+        self.responder
+            .respond(&Event::Start { initial })
+            .unwrap_or_else(|e| {
+                error!(
+                    "failed to react to transition to initial state, \
+                     continuing to run, error: {}",
+                    e
+                )
+            });
         // sensors cannot be reset
 
         if let Err(err) = self.enter() {
@@ -85,11 +99,13 @@ impl Machine {
             return false;
         }
 
+        // First ensure that finished actuators are picked up
+        self.actuate();
+
+        // Then read inputs and perform transitions as necessary
         if let Err(err) = self.sense() {
             error!("Error when processing input: {}", err);
         }
-
-        self.actuate();
 
         !self.is_terminal()
     }
@@ -102,6 +118,13 @@ impl Machine {
         self.current_state_idx == 0
     }
 
+    fn responder_done(&self) -> bool {
+        match self.last_responder_state {
+            ResponderState::Idle => true,
+            _ => false,
+        }
+    }
+
     /// Accepts the next input from actuators and changes state
     /// if a transition is defined.
     fn sense(&mut self) -> Result<()> {
@@ -110,17 +133,17 @@ impl Machine {
 
             // Priority 1: timeout after actuators finished on last tick
             let timeout_transition = self
-                .current_actuators_done_time
+                .responder_done_time
                 .and_then(|done_time| state.transition_for_timeout(done_time));
 
-            // Priority 2: end transition from this tick
-            let end_transition = if self.actuators.done() {
+            // Priority 2: end transition from last tick
+            let end_transition = if self.responder_done() {
                 self.current_state().transition_end()
             } else {
                 None
             };
 
-            // Priority 3: transitions from dialing
+            // Priority 3: transitions from dialing in this tick
             let input_transition = self
                 .sensors
                 .poll()
@@ -138,13 +161,18 @@ impl Machine {
     }
 
     fn actuate(&mut self) {
-        self.actuators
-            .update()
-            .expect("Failed to update actuators.");
+        self.last_responder_state = self.responder.update().unwrap_or_else(|e| {
+            error!(
+                "failed to update actuators, \
+                 continuing and considering them as finished, error: {}",
+                e
+            );
+            ResponderState::Idle
+        });
 
-        if self.current_actuators_done_time.is_none() && self.actuators.done() {
+        if self.responder_done_time.is_none() && self.responder_done() {
             debug!("Actuators done: {:?}", self.current_state().name());
-            self.current_actuators_done_time = Some(Instant::now());
+            self.responder_done_time = Some(Instant::now());
         }
     }
 
@@ -154,25 +182,42 @@ impl Machine {
     }
 
     fn transition_to(&mut self, idx: usize) -> Result<()> {
+        let prev_idx = self.current_state_idx;
         self.current_state_idx = idx;
-        if self.in_initial_state() {
-            self.actuators.reset()?;
-        }
+
+        self.respond_to_transition(prev_idx, idx)
+            .unwrap_or_else(|e| {
+                error!(
+                    "failed to react to transition, \
+                     continuing to run, error: {}",
+                    e
+                )
+            });
 
         self.enter()
     }
 
+    fn respond_to_transition(&mut self, from: usize, to: usize) -> Result<()> {
+        let from = &self.states[from];
+        let to = &self.states[to];
+
+        // first the generic transition event
+        self.responder.respond(&Event::Transition { from, to })?;
+
+        // then specialized for initial/terminal, only if transition evt did not err
+        if self.in_initial_state() {
+            self.responder.respond(&Event::Start { initial: to })
+        } else if to.is_terminal() {
+            self.responder.respond(&Event::Finish { terminal: to })
+        } else {
+            Ok(())
+        }
+    }
+
     /// Enters the current state.
     fn enter(&mut self) -> Result<()> {
-        let state = &self.states[self.current_state_idx];
-        let actuators = &mut self.actuators;
-
-        debug!("Will transition to: {}", state.name());
-        actuators.transition_to(state)?;
-
         self.last_enter_time = Instant::now();
-        self.current_actuators_done_time = None;
-
+        self.responder_done_time = None;
         Ok(())
     }
 }
@@ -180,6 +225,8 @@ impl Machine {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::acts::Actuators;
+    use crate::testutil::assert_duration;
     use std::thread::yield_now;
     use std::time::Duration;
     use tavla::{any_voice, Speech, Voice};
@@ -197,19 +244,22 @@ mod test {
     #[test]
     #[should_panic]
     fn out_of_bounds_end_transition_target() {
-        Machine::new(
+        let mut machine = Machine::new(
             Sensors::builder().build(),
             Actuators::new(&None, &[]).unwrap(),
             &[State::builder()
                 .name("with illegal end transition target")
                 .end(1)
                 .build()],
-        )
-        .update();
+        );
+
+        machine.update();
     }
 
     #[test]
     fn timeout_starts_after_ringing() {
+        crate::log::init_test_logging();
+
         let ring_time = Duration::from_millis(200);
         let timeout = Duration::from_millis(350);
         let expected_duration = ring_time + timeout;
@@ -225,18 +275,11 @@ mod test {
 
         let test_duration = time_until_done_when_no_input(states);
 
-        let error = delta(test_duration, expected_duration);
-        let tolerance = Duration::from_millis(50);
-        assert!(
-            error <= tolerance,
-            "Timeout was more than 50ms off from expected time"
-        );
+        assert_duration("execution time", expected_duration, test_duration);
     }
 
     #[test]
     fn timeout_starts_after_speech() {
-        const TOLERANCE: Duration = Duration::from_millis(150);
-
         let text = ".........";
         let speech_time = actual_speech_time(text);
         let timeout = Duration::from_millis(220);
@@ -253,13 +296,7 @@ mod test {
             State::builder().name("done").terminal(true).build(),
         ]);
 
-        let error = delta(test_duration, expected_duration);
-        assert!(
-            error <= TOLERANCE,
-            "Timeout was more than {tolerance:?} off from expected time. Off by {error:?}.",
-            tolerance = TOLERANCE,
-            error = error
-        );
+        assert_duration("execution time", expected_duration, test_duration);
     }
 
     /// Check how long it takes to speak the given string by actually
@@ -291,13 +328,5 @@ mod test {
             yield_now()
         } // Run until finished
         test_start.elapsed() // And report how long it took
-    }
-
-    fn delta(duration0: Duration, duration1: Duration) -> Duration {
-        if duration0 > duration1 {
-            duration0 - duration1
-        } else {
-            duration1 - duration0
-        }
     }
 }

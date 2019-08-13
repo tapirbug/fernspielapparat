@@ -32,7 +32,10 @@ pub fn init_logging(verbosity_level: Option<u64>) {
 #[cfg(test)]
 pub fn init_test_logging() {
     INIT_TEST_LOGGING.call_once(|| {
-        let _ = env_logger::builder().is_test(true).init();
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Debug)
+            .is_test(true)
+            .init();
     })
 }
 

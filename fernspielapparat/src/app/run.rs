@@ -13,7 +13,7 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct Run {
     /// Hold on to the book so the temp dir is preserved.
     _book: Book,
-    machine: Machine,
+    machine: Machine<Actuators>,
     phone: Option<Arc<Mutex<Phone>>>,
 }
 
