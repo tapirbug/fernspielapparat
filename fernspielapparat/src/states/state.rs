@@ -1,10 +1,13 @@
 use crate::senses::Input;
 pub use builder::StateBuilder;
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[derive(Default, Debug, Clone)]
 pub struct State {
+    /// Unique ID of this state, for communication with
+    /// the outside world. We internally use only indexes.
+    id: String,
     /// Name of this state, not guaranteed to be unique.
     name: String,
     speech: String,
@@ -26,6 +29,10 @@ pub struct State {
 impl State {
     pub fn builder() -> StateBuilder {
         Default::default()
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
     }
 
     pub fn name(&self) -> &str {
@@ -52,9 +59,9 @@ impl State {
 
     /// Returns a transition target ID or `None` for no
     /// transition.
-    pub fn transition_for_timeout(&self, enter_time: Instant) -> Option<usize> {
+    pub fn transition_for_timeout(&self, done_for: &Duration) -> Option<usize> {
         if let Some((timeout_duration, timeout_target)) = self.timeout_transition.as_ref() {
-            if enter_time.elapsed() > *timeout_duration {
+            if done_for > timeout_duration {
                 return Some(*timeout_target);
             }
         }
@@ -82,6 +89,14 @@ mod builder {
     impl StateBuilder {
         pub fn name(mut self, name: impl Into<String>) -> Self {
             self.state.name = name.into();
+            self
+        }
+
+        /// Sets the unique ID for this state.
+        ///
+        /// It is up to the caller to enforce uniqueness.
+        pub fn id(mut self, id: impl Into<String>) -> Self {
+            self.state.id = id.into();
             self
         }
 

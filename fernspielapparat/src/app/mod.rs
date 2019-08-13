@@ -3,8 +3,12 @@ mod run;
 
 use crate::serve::Request;
 use crate::serve::Server;
+
 use failure::Error;
+use log::debug;
 use run::Run;
+
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
 use std::sync::Arc;
 use std::thread::sleep;
@@ -26,7 +30,7 @@ pub struct App {
     ///
     /// Can be modified by remote control messages.
     run: Run,
-    server: Option<Server>,
+    server: Option<Rc<Server>>,
     /// Behavior when phonebook reaches a terminal state.
     terminal_state_behavior: TerminalStateBehavior,
     termination_flag: Arc<AtomicBool>,
@@ -60,7 +64,10 @@ impl App {
             let running = self.run.tick();
             if !running {
                 match self.terminal_state_behavior {
-                    TerminalStateBehavior::Exit => break,
+                    TerminalStateBehavior::Exit => {
+                        debug!("reached terminal state, exiting");
+                        break;
+                    }
                     TerminalStateBehavior::Rewind => self.run.reset(),
                 }
             }

@@ -1,17 +1,17 @@
 mod compile;
 pub(crate) mod spec;
-pub use compile::Book;
+pub use compile::{compile, Book};
 use failure::Error;
 use serde_yaml;
 use std::path::Path;
 
 pub fn from_path(source_file: impl AsRef<Path>) -> Result<Book, Error> {
-    file::load(source_file).and_then(compile::compile)
+    file::load(source_file).and_then(compile)
 }
 
 pub fn from_str(source_string: impl AsRef<str>) -> Result<Book, Error> {
     let book = serde_yaml::from_str(source_string.as_ref())?;
-    compile::compile(book)
+    compile(book)
 }
 
 /// pub(crate) for testing, loads YAML files

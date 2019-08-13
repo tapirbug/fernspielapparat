@@ -1,4 +1,6 @@
-use crate::evt::{Event, Responder, ResponderState};
+use super::sym::Symbol;
+
+use crate::evt::{Event as EventForState, Responder, ResponderState};
 use crate::senses::Sensors;
 use crate::states::State;
 
@@ -9,6 +11,7 @@ use std::mem::replace;
 use std::time::Instant;
 
 type Result<T> = std::result::Result<T, Error>;
+type Event<'a> = EventForState<'a, State>;
 
 /// A state machine modelled after a mealy machine.
 pub struct Machine<R> {
@@ -80,6 +83,21 @@ impl<R: Responder<State>> Machine<R> {
                     e
                 )
             });
+
+        if initial.is_terminal() {
+            // initial state is also terminal state,
+            // immediately send the finish event
+            self.responder
+                .respond(&Event::Finish { terminal: initial })
+                .unwrap_or_else(|e| {
+                    error!(
+                        "failed to react to immediate finish of  \
+                         initial state, continuing to run, error: {}",
+                        e
+                    )
+                });
+        }
+
         // sensors cannot be reset
 
         if let Err(err) = self.enter() {
@@ -125,39 +143,48 @@ impl<R: Responder<State>> Machine<R> {
         }
     }
 
-    /// Accepts the next input from actuators and changes state
+    /// Accepts the next input from sensors and changes state
     /// if a transition is defined.
+    ///
+    /// If a transition ocurred, returns the causing symbol
+    /// and a reference to that state.
     fn sense(&mut self) -> Result<()> {
-        let transition = {
-            let state = self.current_state();
-
-            // Priority 1: timeout after actuators finished on last tick
-            let timeout_transition = self
-                .responder_done_time
-                .and_then(|done_time| state.transition_for_timeout(done_time));
-
-            // Priority 2: end transition from last tick
-            let end_transition = if self.responder_done() {
-                self.current_state().transition_end()
-            } else {
-                None
-            };
-
-            // Priority 3: transitions from dialing in this tick
-            let input_transition = self
-                .sensors
-                .poll()
-                .and_then(|i| self.current_state().transition_for_input(i));
-
-            timeout_transition.or(end_transition).or(input_transition)
-        };
+        // Read the next symbol and form a pair with a transition target.
+        let transition = self
+            .poll_input()
+            .and_then(|i| self.find_transition(&i).map(|t| (i, t)));
 
         // If anything triggered a transition, perform it.
-        if let Some(next_idx) = transition {
-            self.transition_to(next_idx)?;
-        };
+        if let Some((symbol, next_idx)) = transition {
+            self.transition_to(symbol, next_idx)?;
+        }
 
         Ok(())
+    }
+
+    fn poll_input(&mut self) -> Option<Symbol> {
+        self.sensors
+            .poll()
+            .map(Symbol::Dial)
+            // timeouts are only considered when there is no simultaneous input
+            .or_else(|| self.responder_done_time.map(|t| Symbol::Done(t.elapsed())))
+    }
+
+    /// Finds a transition target index that should be transitioned to
+    /// after reading the given symbol.
+    fn find_transition(&mut self, symbol: &Symbol) -> Option<usize> {
+        let state = self.current_state();
+        match symbol {
+            // Priority 1: transitions from dialing in this tick
+            Symbol::Dial(input) => state.transition_for_input(*input),
+            Symbol::Done(duration) => {
+                // Priority 2: timeout with time value
+                state
+                    .transition_for_timeout(duration)
+                    // Priority 3: end transition from last tick
+                    .or_else(|| state.transition_end())
+            }
+        }
     }
 
     fn actuate(&mut self) {
@@ -181,11 +208,11 @@ impl<R: Responder<State>> Machine<R> {
         self.current_state().is_terminal()
     }
 
-    fn transition_to(&mut self, idx: usize) -> Result<()> {
+    fn transition_to(&mut self, cause: Symbol, idx: usize) -> Result<()> {
         let prev_idx = self.current_state_idx;
         self.current_state_idx = idx;
 
-        self.respond_to_transition(prev_idx, idx)
+        self.respond_to_transition(cause, prev_idx, idx)
             .unwrap_or_else(|e| {
                 error!(
                     "failed to react to transition, \
@@ -197,12 +224,13 @@ impl<R: Responder<State>> Machine<R> {
         self.enter()
     }
 
-    fn respond_to_transition(&mut self, from: usize, to: usize) -> Result<()> {
+    fn respond_to_transition(&mut self, cause: Symbol, from: usize, to: usize) -> Result<()> {
         let from = &self.states[from];
         let to = &self.states[to];
 
         // first the generic transition event
-        self.responder.respond(&Event::Transition { from, to })?;
+        self.responder
+            .respond(&Event::Transition { cause, from, to })?;
 
         // then specialized for initial/terminal, only if transition evt did not err
         if self.in_initial_state() {

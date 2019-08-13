@@ -7,6 +7,7 @@ use crate::serve::Server;
 use failure::Error;
 use log::error;
 
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
 use std::sync::{Arc, Mutex};
 
@@ -108,9 +109,10 @@ impl Builder {
             terminal_state_behavior,
             termination_flag,
         } = self;
+        let server = server.map(Rc::new);
 
         let app = App {
-            run: Run::new(startup_book, phone)?,
+            run: Run::new(startup_book, phone, server.as_ref().map(Rc::clone))?,
             server,
             terminal_state_behavior,
             termination_flag,

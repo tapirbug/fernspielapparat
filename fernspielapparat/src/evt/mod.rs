@@ -1,6 +1,12 @@
 //! Module for state machine events that a remote controlling
 //! application may be interested in.
+use crate::states::Symbol;
+
 use failure::Error;
+
+mod composite;
+
+pub use composite::CompositeResponder;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -13,15 +19,22 @@ pub enum Event<'a, S> {
     /// initial state to be reached again.
     ///
     /// The specified initial state is now current.
+    #[allow(unused)] // used through type aliases, but rustc does not pick it up
     Start { initial: &'a S },
     /// The phonebook has progressed to a terminal state.
+    #[allow(unused)] // used through type aliases, but rustc does not pick it up
     Finish { terminal: &'a S },
     /// User input, timeout or other conditions caused a
     /// transition from one state to another.
     ///
     /// Is delivered _before_ the `Start` and `Finish`
     /// variants.
-    Transition { from: &'a S, to: &'a S },
+    #[allow(unused)] // used through type aliases, but rustc does not pick it up
+    Transition {
+        cause: Symbol,
+        from: &'a S,
+        to: &'a S,
+    },
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]

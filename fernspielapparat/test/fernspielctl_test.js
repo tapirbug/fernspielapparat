@@ -5,7 +5,8 @@ window.fernspielctl = (() => {
   let socket
 
   return {
-    reset () {
+    reconnect: reconnect,
+    reset() {
       return reconnect()
         .then(socket => {
           console.log('connection established')
@@ -16,7 +17,7 @@ window.fernspielctl = (() => {
           ))
         })
     },
-    run (phonebook) {
+    run(phonebook) {
       return reconnect()
         .then(socket => {
           console.log('connection established')
@@ -28,7 +29,7 @@ window.fernspielctl = (() => {
           socket.send(msg)
         })
     },
-    runTestBook () {
+    runTestBook() {
       return this.run({
         initial: 'ok',
         states: {
@@ -45,7 +46,7 @@ window.fernspielctl = (() => {
     }
   }
 
-  function reconnect () {
+  function reconnect() {
     return new Promise((resolve, reject) => {
       if (socket) {
         socket.close()
@@ -57,6 +58,9 @@ window.fernspielctl = (() => {
       }
       socket.onerror = err => {
         reject(err)
+      }
+      socket.onmessage = ({ data }) => {
+        console.log(data)
       }
     })
   }

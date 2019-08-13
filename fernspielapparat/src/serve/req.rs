@@ -1,4 +1,4 @@
-use crate::books::{self, Book};
+use crate::books::{compile, spec::Book as BookSpec, Book};
 use failure::{format_err, Error};
 use serde::Deserialize;
 use serde_yaml::from_str;
@@ -26,7 +26,7 @@ pub enum Request {
 #[serde(tag = "invoke", content = "with")]
 enum Spec {
     #[serde(rename = "run")]
-    Run(String),
+    Run(BookSpec),
     #[serde(rename = "reset")]
     Reset,
 }
@@ -45,7 +45,7 @@ impl Request {
 impl Spec {
     fn compile(self) -> Result<Request> {
         Ok(match self {
-            Spec::Run(string) => Request::Run(books::from_str(string)?),
+            Spec::Run(string) => Request::Run(compile(string)?),
             Spec::Reset => Request::Reset,
         })
     }
@@ -60,7 +60,13 @@ mod test {
         // given
         let reset = "{
             \"invoke\":\"run\",
-            \"with\": \"{\\\"initial\\\":\\\"lonelystate\\\",\\\"states\\\":{\\\"lonelystate\\\":{}},\\\"transitions\\\":{}}\"
+            \"with\": {
+                \"initial\": \"lonelystate\",
+                \"states\":{
+                    \"lonelystate\":{}
+                },
+                \"transitions\":{}
+            }
         }";
 
         // when

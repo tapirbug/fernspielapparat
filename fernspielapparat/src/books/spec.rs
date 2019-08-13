@@ -18,7 +18,7 @@ impl fmt::Display for Id {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Book {
     pub initial: Id,
     pub states: HashMap<Id, Option<State>>,
@@ -28,7 +28,7 @@ pub struct Book {
     pub sounds: HashMap<Id, Sound>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Debug)]
 pub struct State {
     /// Name of the state, does not have to be unique.
     #[serde(default)]
@@ -46,7 +46,7 @@ pub struct State {
     pub sounds: Vec<Id>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Debug)]
 pub struct Sound {
     #[serde(default)]
     pub speech: Option<String>,
@@ -70,7 +70,7 @@ pub struct Sound {
     pub start_offset: Option<f64>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Debug)]
 pub struct Lighting {
     #[serde(default)]
     pub power: i8,
@@ -80,7 +80,7 @@ pub struct Lighting {
     pub mood: i8,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Debug)]
 pub struct Transitions {
     /// When input in some format was received.
     #[serde(default)]
@@ -92,7 +92,7 @@ pub struct Transitions {
     pub timeout: Option<Timeout>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Timeout {
     /// Time in seconds.
     pub after: f64,

@@ -46,11 +46,18 @@ mod book {
             }
         }
 
-        /// Returns a phonebook where the initial state
-        /// is also the final state and does nothing.
+        /// Returns a phonebook with only an initial state
+        /// that does nothing.
+        ///
+        /// There is no terminal state and the book never
+        /// finishes.
         pub fn passive() -> Self {
             Book {
-                states: vec![State::builder().name("passive").terminal(true).build()],
+                states: vec![State::builder()
+                    .id("passive")
+                    .name("passive")
+                    .terminal(false)
+                    .build()],
                 sounds: vec![],
                 compiled_speech_dir: None,
             }
@@ -361,9 +368,11 @@ fn compile_state(
     transitions: &Transitions,
     sounds: &HashMap<Id, usize>,
 ) -> Result<State, Error> {
+    let id_str = format!("{}", state_id);
     let mut state = State::builder()
+        .id(&id_str)
         .name(if spec.name.is_empty() {
-            format!("{}", state_id)
+            id_str
         } else {
             spec.name.clone()
         })
