@@ -147,7 +147,7 @@ mod mock {
     pub enum Phone {}
 
     impl Phone {
-        pub fn new() -> Result<Phone> {
+        pub fn connect(_i2c_device: &str, _address: u16) -> Result<Self> {
             Err(Error::new(
                 ErrorKind::NotFound,
                 "I2C phone is not supported on this platform.",
