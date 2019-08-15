@@ -176,7 +176,7 @@ impl Player {
 
     pub fn played(&self) -> Duration {
         match self.pending_seek {
-            Some(seeking_to) => dbg!(seeking_to),
+            Some(seeking_to) => seeking_to,
             None => match self.player.state() {
                 State::Stopped | State::Ended | State::Error => self.duration(),
                 _ => self

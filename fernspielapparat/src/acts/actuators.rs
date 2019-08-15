@@ -161,7 +161,9 @@ impl Responder<State> for Actuators {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::testutil::assert_duration;
+    use crate::testutil::{
+        assert_duration, assert_duration_tolerance, WILHELM_SCREAM, WILHELM_SCREAM_DURATION,
+    };
     use std::thread::yield_now;
     use std::time::{Duration, Instant};
 
@@ -183,6 +185,7 @@ mod test {
             .respond(&start_at_timeout_state)
             .expect("failed to respond");
 
+        let state_initial = actuators.update().unwrap();
         while let ResponderState::Running = actuators.update().unwrap() {
             yield_now();
         }
@@ -193,6 +196,48 @@ mod test {
         // then
         let actual_duration = time_after.duration_since(time_before);
         assert_duration("ring duration", ring_duration, actual_duration);
+        assert_eq!(state_initial, ResponderState::Running);
+        assert_eq!(state_after, ResponderState::Idle);
+    }
+
+    #[test]
+    fn responder_state_changes_to_idle_when_non_loop_music_finished() {
+        // given
+        crate::log::init_test_logging();
+        let mut actuators = Actuators::new(
+            &None,
+            &[SoundSpec::builder().source(WILHELM_SCREAM).build()],
+        )
+        .expect("could not create actuators");
+        let timeout_state = &State::builder().sounds(vec![0]).build();
+        let start_at_timeout_state = Event::Start {
+            initial: timeout_state,
+        };
+
+        // when
+        let time_before = Instant::now();
+
+        actuators
+            .respond(&start_at_timeout_state)
+            .expect("failed to respond");
+
+        let state_initial = actuators.update().unwrap();
+        while let ResponderState::Running = actuators.update().unwrap() {
+            yield_now();
+        }
+        let state_after = actuators.update().unwrap();
+
+        let time_after = Instant::now();
+
+        // then
+        let actual_duration = time_after.duration_since(time_before);
+        assert_duration_tolerance(
+            "scream duration",
+            WILHELM_SCREAM_DURATION,
+            actual_duration,
+            Duration::from_millis(150),
+        );
+        assert_eq!(state_initial, ResponderState::Running);
         assert_eq!(state_after, ResponderState::Idle);
     }
 }

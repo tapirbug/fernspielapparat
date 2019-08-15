@@ -1,5 +1,4 @@
 use std::thread::spawn;
-use std::time::Instant;
 use websocket::client::builder::ClientBuilder;
 use websocket::OwnedMessage;
 

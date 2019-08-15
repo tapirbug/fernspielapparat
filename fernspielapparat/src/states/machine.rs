@@ -125,7 +125,14 @@ impl<R: Responder<State>> Machine<R> {
             error!("Error when processing input: {}", err);
         }
 
-        !self.is_terminal()
+        let terminal = self.is_terminal();
+        if terminal {
+            debug!(
+                "reached terminal state \"{name}\"",
+                name = self.current_state().name()
+            );
+        }
+        !terminal
     }
 
     fn current_state(&self) -> &State {
@@ -134,13 +141,6 @@ impl<R: Responder<State>> Machine<R> {
 
     fn in_initial_state(&self) -> bool {
         self.current_state_idx == 0
-    }
-
-    fn responder_done(&self) -> bool {
-        match self.last_responder_state {
-            ResponderState::Idle => true,
-            _ => false,
-        }
     }
 
     /// Accepts the next input from sensors and changes state
@@ -203,6 +203,13 @@ impl<R: Responder<State>> Machine<R> {
         }
     }
 
+    fn responder_done(&self) -> bool {
+        match self.last_responder_state {
+            ResponderState::Idle => true,
+            _ => false,
+        }
+    }
+
     /// `true`, if a terminal state has been reached.
     pub fn is_terminal(&self) -> bool {
         self.current_state().is_terminal()
@@ -253,11 +260,21 @@ impl<R: Responder<State>> Machine<R> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::acts::Actuators;
-    use crate::testutil::assert_duration;
+    use crate::acts::{Actuators, SoundSpec};
+    use crate::testutil::{
+        actual_speech_time, assert_duration, assert_duration_tolerance, TEST_MUSIC, WILHELM_SCREAM,
+        WILHELM_SCREAM_DURATION,
+    };
     use std::thread::yield_now;
     use std::time::Duration;
-    use tavla::{any_voice, Speech, Voice};
+
+    #[derive(Clone)]
+    struct ValuedNullResponder(String);
+    impl Responder<State> for ValuedNullResponder {
+        fn respond(&mut self, _: &Event) -> Result<()> {
+            Ok(())
+        }
+    }
 
     #[test]
     #[should_panic]
@@ -301,7 +318,8 @@ mod test {
             State::builder().name("done").terminal(true).build(),
         ];
 
-        let test_duration = time_until_done_when_no_input(states);
+        let mut machine = machine_with_states(states);
+        let test_duration = time_until_done_when_no_input(&mut machine);
 
         assert_duration("execution time", expected_duration, test_duration);
     }
@@ -313,9 +331,7 @@ mod test {
         let timeout = Duration::from_millis(220);
         let expected_duration = speech_time + timeout;
 
-        dbg!(speech_time);
-
-        let test_duration = time_until_done_when_no_input(&[
+        let mut machine = machine_with_states(&[
             State::builder()
                 .name("speaking")
                 .speech(text)
@@ -323,35 +339,119 @@ mod test {
                 .build(),
             State::builder().name("done").terminal(true).build(),
         ]);
+        let test_duration = time_until_done_when_no_input(&mut machine);
 
         assert_duration("execution time", expected_duration, test_duration);
     }
 
-    /// Check how long it takes to speak the given string by actually
-    /// doing it and measuring.
-    fn actual_speech_time(for_str: &str) -> Duration {
-        let voice = any_voice().expect("Could not load voice to calculate expected timeout time");
+    #[test]
+    fn load_with_different_responder() {
+        // given
+        let responder1 = ValuedNullResponder("1".to_string());
+        let responder2 = ValuedNullResponder("2".to_string());
+        let states = &[
+            State::builder()
+                .name("ringing")
+                .timeout(Duration::from_secs(1), 1)
+                .build(),
+            State::builder().name("done").terminal(true).build(),
+        ];
 
-        let speech_start = Instant::now();
+        // when
+        let mut machine = Machine::new(Sensors::blind(), responder1, states);
+        let ValuedNullResponder(before) = machine.responder.clone();
+        machine.load(responder2, states);
+        let ValuedNullResponder(after) = machine.responder.clone();
 
-        voice
-            .speak(for_str)
-            .expect("Failed to speak string to calculate expected timeout time")
-            .await_done()
-            .expect("Failed to wait for speech end");
-
-        speech_start.elapsed()
+        // then
+        assert_ne!(
+            before, after,
+            "expected new responder after load to be different"
+        );
     }
 
-    fn time_until_done_when_no_input(states: &[State]) -> Duration {
-        let test_start = Instant::now();
+    #[test]
+    fn load_other_states() {
+        // given
+        // VLC loading takes some time, and so does picking up that it has finished
+        const TOLERANCE: Duration = Duration::from_millis(150);
+        let initial_states = [
+            State::builder()
+                .id("initial initial")
+                .name("initial initial")
+                .sounds(vec![0])
+                .end(1)
+                .build(),
+            State::builder()
+                .id("initial terminal")
+                .name("initial terminal")
+                .terminal(true)
+                .build(),
+        ];
+        let loaded_states = [
+            State::builder()
+                .id("loaded initial")
+                .name("loaded initial")
+                .sounds(vec![1])
+                .end(1)
+                .build(),
+            State::builder()
+                .id("loaded terminal")
+                .name("loaded terminal")
+                .terminal(true)
+                .build(),
+        ];
+        let initial_sounds = &[SoundSpec::builder().source(TEST_MUSIC).build()];
+        let loaded_sounds = &[
+            SoundSpec::builder().source(TEST_MUSIC).build(),
+            SoundSpec::builder().source(WILHELM_SCREAM).build(),
+        ];
 
-        let mut machine = Machine::new(
-            Sensors::builder().build(),
-            Actuators::new(&None, &[]).unwrap(),
-            states,
+        // when
+        let mut machine = machine_with_sound(&initial_states[..], initial_sounds);
+        let active_before_load = machine.update();
+        machine.load(
+            Actuators::new(&None, loaded_sounds).unwrap(),
+            &loaded_states,
         );
+        let active_after_load = machine.update();
+        let duration = time_until_done_when_no_input(&mut machine);
 
+        // then
+        assert!(
+            active_before_load,
+            "expected update to return true in initial configuration"
+        );
+        assert!(
+            active_after_load,
+            "expected update to return true after loading new states"
+        );
+        assert_duration_tolerance(
+            "execution time",
+            WILHELM_SCREAM_DURATION,
+            duration,
+            TOLERANCE,
+        );
+    }
+
+    fn null_actuators() -> Actuators {
+        Actuators::new(&None, &[]).unwrap()
+    }
+
+    fn machine_with_states(states: &[State]) -> Machine<Actuators> {
+        Machine::new(Sensors::blind(), null_actuators(), states)
+    }
+
+    fn machine_with_sound(states: &[State], sounds: &[SoundSpec]) -> Machine<Actuators> {
+        Machine::new(
+            Sensors::blind(),
+            Actuators::new(&None, sounds).unwrap(),
+            states,
+        )
+    }
+
+    fn time_until_done_when_no_input<R: Responder<State>>(machine: &mut Machine<R>) -> Duration {
+        let test_start = Instant::now();
         while machine.update() {
             yield_now()
         } // Run until finished
