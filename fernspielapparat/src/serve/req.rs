@@ -1,9 +1,9 @@
 use crate::books::{compile, spec::Book as BookSpec, Book};
-use failure::{format_err, Error};
+use crate::result::Result;
+
+use failure::format_err;
 use serde::Deserialize;
 use serde_yaml::from_str;
-
-type Result<T> = std::result::Result<T, Error>;
 
 /// A request of a controlling application sent over web socket,
 /// indicating to the runtime what action to perform.

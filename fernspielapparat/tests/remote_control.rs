@@ -39,12 +39,12 @@ terminal:
 
 #[test]
 fn deploy_and_then_observe_transition() {
+    fernspielapparat::log::init_logging(Some(3));
+
     // given
     let port = random_port();
 
     // when
-    //cute_log::init_with_max_level(log::LevelFilter::Debug);
-
     // start without startup phonebook
     spawn(move || {
         let mut app = fernspielapparat::App::builder();
@@ -83,6 +83,7 @@ fn deploy_and_then_observe_transition() {
         .expect("expected message that the machine finished at \"terminal\"")
         .expect("expected ok message");
 
+    client.send_message(&OwnedMessage::Close(None)).unwrap();
     client.shutdown().unwrap();
 
     // then

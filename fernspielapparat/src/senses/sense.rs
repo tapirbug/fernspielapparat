@@ -1,7 +1,6 @@
 use crate::senses::{dial::Input, Error};
-use std::result;
 
-type Result<T> = result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 pub trait Sense {
     /// Tries to get the next input from the sensor in a

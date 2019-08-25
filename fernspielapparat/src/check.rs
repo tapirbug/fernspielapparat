@@ -1,15 +1,13 @@
 //! Functionality to perform hardware checks without running
 //! a phonebook.
 use crate::phone::Phone;
+use crate::result::Result;
 
-use failure::Error;
 use log::{error, info};
 use tavla::{any_voice, Speech, Voice};
 
 use std::thread::sleep;
 use std::time::Duration;
-
-type Result<T> = std::result::Result<T, Error>;
 
 /// Checks I2C phone and speech synthesis.
 ///

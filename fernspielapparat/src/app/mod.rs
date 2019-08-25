@@ -1,10 +1,10 @@
 mod builder;
 mod run;
 
+use crate::result::Result;
 use crate::serve::Request;
 use crate::serve::Server;
 
-use failure::Error;
 use log::debug;
 use run::Run;
 
@@ -15,8 +15,6 @@ use std::thread::sleep;
 use std::time::Duration;
 
 pub use builder::Builder;
-
-type Result<T> = std::result::Result<T, Error>;
 
 /// Controls the main loop, invoking the run for ticks
 /// and controlling termination through the termination

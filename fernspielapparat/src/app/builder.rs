@@ -2,16 +2,14 @@ use super::{App, Run, TerminalStateBehavior};
 
 use crate::books::Book;
 use crate::phone::Phone;
+use crate::result::Result;
 use crate::serve::Server;
 
-use failure::Error;
 use log::error;
 
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
 use std::sync::{Arc, Mutex};
-
-type Result<T> = std::result::Result<T, Error>;
 
 pub struct Builder {
     /// If `None`, starts with an idle run, otherwise

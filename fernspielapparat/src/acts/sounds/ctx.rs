@@ -1,6 +1,6 @@
-use failure::{format_err, Error};
+use crate::result::Result;
 
-type Result<T> = std::result::Result<T, Error>;
+use failure::format_err;
 
 /// Manages resources required for creating players.
 pub struct PlayerContext(vlc::Instance);

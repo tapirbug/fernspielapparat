@@ -2,16 +2,14 @@ use crate::acts::Actuators;
 use crate::books::Book;
 use crate::evt::Responder;
 use crate::phone::Phone;
+use crate::result::Result;
 use crate::senses::init_sensors;
 use crate::serve::{EventPublisher, Server};
 use crate::states::State;
 
-use failure::Error;
-
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-type Result<T> = std::result::Result<T, Error>;
 type CompositeResponder = crate::evt::CompositeResponder<State>;
 type Machine = crate::states::Machine<CompositeResponder>;
 
@@ -111,15 +109,14 @@ mod test {
     use crate::books::spec::Sound as SoundSpec;
     use crate::log::init_test_logging;
     use crate::testutil::{
-        actual_speech_time, assert_duration, assert_duration_tolerance, TEST_MUSIC, WILHELM_SCREAM,
-        WILHELM_SCREAM_DURATION,
+        actual_speech_time, assert_duration_tolerance, MediaInfo, TEST_MUSIC, WILHELM_SCREAM,
     };
     use std::thread::yield_now;
     use std::time::{Duration, Instant};
 
     /// Some grace time since VLC needs to load a little before playing
     /// and the state machine needs some time to pick up that VLC has finished
-    const TOLERANCE: Duration = Duration::from_millis(150);
+    const TOLERANCE: Duration = Duration::from_millis(250);
 
     #[test]
     fn switch_to_new_speech() {
@@ -196,10 +193,11 @@ mod test {
         assert_ne!(initial_sounds, new_sounds);
         assert_eq!(initial_sounds.len(), 1);
         assert_eq!(new_sounds.len(), 2);
-        assert_duration(
+        assert_duration_tolerance(
             "evaluation time",
             new_text_duration,
             new_state_tick_duration,
+            TOLERANCE,
         );
     }
 
@@ -207,8 +205,12 @@ mod test {
     fn switch_to_new_music_non_looping() {
         // given
         init_test_logging();
+        let scream_info = MediaInfo::obtain(WILHELM_SCREAM).unwrap();
+
         let mut book_with_one_sound = Book::builder();
         book_with_one_sound
+            .sound(music_non_looping(TEST_MUSIC))
+            .unwrap()
             .sound(music_non_looping(TEST_MUSIC))
             .unwrap()
             .state(
@@ -231,13 +233,11 @@ mod test {
         book_with_two_sounds
             .sound(music_non_looping(WILHELM_SCREAM))
             .unwrap()
-            .sound(music_non_looping(WILHELM_SCREAM))
-            .unwrap()
             .state(
                 State::builder()
                     .id("Book 2 State with index 0")
                     .name("Book 2 State with index 0")
-                    .sounds(vec![0, 1])
+                    .sounds(vec![0])
                     .end(1)
                     .build(),
             )
@@ -273,11 +273,11 @@ mod test {
             "run tick already returns false after switch but expected to be busy playing music"
         );
         assert_ne!(initial_sounds, new_sounds);
-        assert_eq!(initial_sounds.len(), 1);
-        assert_eq!(new_sounds.len(), 2);
+        assert_eq!(initial_sounds.len(), 2);
+        assert_eq!(new_sounds.len(), 1);
         assert_duration_tolerance(
             "evaluation time",
-            WILHELM_SCREAM_DURATION,
+            scream_info.actual_duration(),
             new_state_tick_duration,
             TOLERANCE,
         );

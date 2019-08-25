@@ -1,16 +1,15 @@
 use super::sym::Symbol;
 
 use crate::evt::{Event as EventForState, Responder, ResponderState};
+use crate::result::Result;
 use crate::senses::Sensors;
 use crate::states::State;
 
-use failure::Error;
 use log::{debug, error};
 
 use std::mem::replace;
 use std::time::Instant;
 
-type Result<T> = std::result::Result<T, Error>;
 type Event<'a> = EventForState<'a, State>;
 
 /// A state machine modelled after a mealy machine.
@@ -262,8 +261,8 @@ mod test {
     use super::*;
     use crate::acts::{Actuators, SoundSpec};
     use crate::testutil::{
-        actual_speech_time, assert_duration, assert_duration_tolerance, TEST_MUSIC, WILHELM_SCREAM,
-        WILHELM_SCREAM_DURATION,
+        actual_speech_time, assert_duration, assert_duration_tolerance, MediaInfo, TEST_MUSIC,
+        WILHELM_SCREAM,
     };
     use std::thread::yield_now;
     use std::time::Duration;
@@ -374,7 +373,7 @@ mod test {
     fn load_other_states() {
         // given
         // VLC loading takes some time, and so does picking up that it has finished
-        const TOLERANCE: Duration = Duration::from_millis(150);
+        const TOLERANCE: Duration = Duration::from_millis(250);
         let initial_states = [
             State::builder()
                 .id("initial initial")
@@ -406,6 +405,7 @@ mod test {
             SoundSpec::builder().source(TEST_MUSIC).build(),
             SoundSpec::builder().source(WILHELM_SCREAM).build(),
         ];
+        let scream_duration = MediaInfo::obtain(WILHELM_SCREAM).unwrap().actual_duration();
 
         // when
         let mut machine = machine_with_sound(&initial_states[..], initial_sounds);
@@ -426,12 +426,7 @@ mod test {
             active_after_load,
             "expected update to return true after loading new states"
         );
-        assert_duration_tolerance(
-            "execution time",
-            WILHELM_SCREAM_DURATION,
-            duration,
-            TOLERANCE,
-        );
+        assert_duration_tolerance("execution time", scream_duration, duration, TOLERANCE);
     }
 
     fn null_actuators() -> Actuators {

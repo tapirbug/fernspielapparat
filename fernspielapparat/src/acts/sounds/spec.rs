@@ -71,9 +71,10 @@ impl Default for ReenterBehavior {
 
 mod builder {
     use super::*;
-    use failure::{bail, Error};
 
-    pub type Result<T> = std::result::Result<T, Error>;
+    use crate::result::Result;
+
+    use failure::bail;
 
     pub struct SoundSpecBuilder {
         spec: SoundSpec,

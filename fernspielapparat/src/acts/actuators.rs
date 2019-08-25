@@ -2,14 +2,12 @@ use crate::acts::{Act, Ensemble, Ring, SoundSpec, Wait};
 use crate::err::compound_result;
 use crate::evt::{Event, Responder, ResponderState};
 use crate::phone::Phone;
+use crate::result::Result;
 use crate::states::State;
-use failure::Error;
 use log::{debug, error, warn};
 use std::mem::replace;
 use std::sync::{Arc, Mutex, PoisonError};
 use tavla::{any_voice, Voice};
-
-type Result<T> = std::result::Result<T, Error>;
 
 pub struct Actuators {
     active: Vec<Box<dyn Act>>,
@@ -161,11 +159,10 @@ impl Responder<State> for Actuators {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::testutil::{
-        assert_duration, assert_duration_tolerance, WILHELM_SCREAM, WILHELM_SCREAM_DURATION,
-    };
+    use crate::testutil::{assert_duration_tolerance, MediaInfo, WILHELM_SCREAM};
     use std::thread::yield_now;
     use std::time::{Duration, Instant};
+    const TOLERANCE: Duration = Duration::from_millis(250);
 
     #[test]
     fn responder_state_changes_to_idle_when_ring_finished() {
@@ -195,7 +192,7 @@ mod test {
 
         // then
         let actual_duration = time_after.duration_since(time_before);
-        assert_duration("ring duration", ring_duration, actual_duration);
+        assert_duration_tolerance("ring duration", ring_duration, actual_duration, TOLERANCE);
         assert_eq!(state_initial, ResponderState::Running);
         assert_eq!(state_after, ResponderState::Idle);
     }
@@ -213,6 +210,7 @@ mod test {
         let start_at_timeout_state = Event::Start {
             initial: timeout_state,
         };
+        let expected_duration = MediaInfo::obtain(WILHELM_SCREAM).unwrap().actual_duration();
 
         // when
         let time_before = Instant::now();
@@ -233,9 +231,9 @@ mod test {
         let actual_duration = time_after.duration_since(time_before);
         assert_duration_tolerance(
             "scream duration",
-            WILHELM_SCREAM_DURATION,
+            expected_duration,
             actual_duration,
-            Duration::from_millis(150),
+            TOLERANCE,
         );
         assert_eq!(state_initial, ResponderState::Running);
         assert_eq!(state_after, ResponderState::Idle);

@@ -1,3 +1,5 @@
+pub type Result<T> = std::result::Result<T, std::io::Error>;
+
 #[cfg(target_os = "linux")]
 pub use linux::*;
 
@@ -6,7 +8,10 @@ pub use mock::*;
 
 #[cfg(target_os = "linux")]
 mod linux {
+    use super::Result;
+
     use crate::senses::Input;
+
     use i2c_linux;
     use log::debug;
     use std::fs::File;
@@ -14,7 +19,6 @@ mod linux {
     use std::thread::sleep;
     use std::time::Duration;
 
-    type Result<T> = std::result::Result<T, Error>;
     type I2c = i2c_linux::I2c<File>;
 
     // First wait 5ms, then 25, then 125, ... up  until 390_625ms
@@ -138,10 +142,10 @@ mod linux {
 /// is not linux, which is the only platform we support i2c for.
 #[cfg(not(target_os = "linux"))]
 mod mock {
+    use super::Result;
     use crate::senses::Input;
-    use std::io::{Error, ErrorKind};
 
-    type Result<T> = std::result::Result<T, Error>;
+    use std::io::{Error, ErrorKind};
 
     /// Can never be instantiated.
     pub enum Phone {}

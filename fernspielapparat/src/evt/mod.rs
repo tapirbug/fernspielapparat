@@ -1,14 +1,11 @@
 //! Module for state machine events that a remote controlling
 //! application may be interested in.
+use crate::result::Result;
 use crate::states::Symbol;
-
-use failure::Error;
 
 mod composite;
 
 pub use composite::CompositeResponder;
-
-type Result<T> = std::result::Result<T, Error>;
 
 /// State machine event for a machine state evaluates states
 /// of type `S`.

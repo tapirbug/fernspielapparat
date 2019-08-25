@@ -1,6 +1,8 @@
 use crate::senses::{dial::Input, Error, Sense};
+
 use crossbeam_channel::{bounded, Receiver, Sender};
 use log::debug;
+
 use std::thread;
 use std::time::Duration;
 
