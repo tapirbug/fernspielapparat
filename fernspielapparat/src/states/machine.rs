@@ -322,6 +322,7 @@ mod test {
         assert_duration("execution time", expected_duration, test_duration);
     }
 
+    #[cfg_attr(not(feature = "expensive_tests"), ignore)]
     #[test]
     fn timeout_starts_after_speech() {
         let text = ".........";
@@ -368,6 +369,7 @@ mod test {
         );
     }
 
+    #[cfg_attr(not(feature = "expensive_tests"), ignore)]
     #[test]
     fn load_other_states() {
         // given

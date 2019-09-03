@@ -281,6 +281,7 @@ mod test {
 
     /// Starts playing and checks if behaves normally for the first second.
     /// Then pauses the player. Waits a bit and checks if it is still paused.
+    #[cfg_attr(not(feature = "expensive_tests"), ignore)]
     #[test]
     fn play_then_pause() {
         // given
@@ -357,6 +358,7 @@ mod test {
 
     /// Checks that playing a media file of a known duration does
     /// not take significantly longer to actually play.
+    #[cfg_attr(not(feature = "expensive_tests"), ignore)]
     #[test]
     fn playing_duration_wilhelm_scream() {
         // given
@@ -387,6 +389,7 @@ mod test {
 
     /// Starts playing and fast forwards to near the end.
     /// Checks if stops after reaching the end.
+    #[cfg_attr(not(feature = "expensive_tests"), ignore)]
     #[test]
     fn fast_forward() {
         // given
@@ -435,6 +438,7 @@ mod test {
         assert_eq!(played_time, played_time_after_wait);
     }
 
+    #[cfg_attr(not(feature = "expensive_tests"), ignore)]
     #[test]
     fn can_rewind_after_finished() {
         // given

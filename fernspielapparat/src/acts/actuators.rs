@@ -196,6 +196,7 @@ mod test {
         assert_eq!(state_after, ResponderState::Idle);
     }
 
+    #[cfg_attr(not(feature = "expensive_tests"), ignore)]
     #[test]
     fn responder_state_changes_to_idle_when_non_loop_music_finished() {
         // given

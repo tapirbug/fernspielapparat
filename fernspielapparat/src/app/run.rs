@@ -114,6 +114,7 @@ mod test {
     use std::thread::yield_now;
     use std::time::Instant;
 
+    #[cfg_attr(not(feature = "expensive_tests"), ignore)]
     #[test]
     fn switch_to_new_speech() {
         // given
@@ -196,6 +197,7 @@ mod test {
         );
     }
 
+    #[cfg_attr(not(feature = "expensive_tests"), ignore)]
     #[test]
     fn switch_to_new_music_non_looping() {
         // given
