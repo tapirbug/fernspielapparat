@@ -109,14 +109,10 @@ mod test {
     use crate::books::spec::Sound as SoundSpec;
     use crate::log::init_test_logging;
     use crate::testutil::{
-        actual_speech_time, assert_duration_tolerance, MediaInfo, TEST_MUSIC, WILHELM_SCREAM,
+        actual_speech_time, assert_duration, MediaInfo, TEST_MUSIC, WILHELM_SCREAM,
     };
     use std::thread::yield_now;
-    use std::time::{Duration, Instant};
-
-    /// Some grace time since VLC needs to load a little before playing
-    /// and the state machine needs some time to pick up that VLC has finished
-    const TOLERANCE: Duration = Duration::from_millis(250);
+    use std::time::Instant;
 
     #[test]
     fn switch_to_new_speech() {
@@ -193,11 +189,10 @@ mod test {
         assert_ne!(initial_sounds, new_sounds);
         assert_eq!(initial_sounds.len(), 1);
         assert_eq!(new_sounds.len(), 2);
-        assert_duration_tolerance(
+        assert_duration(
             "evaluation time",
             new_text_duration,
             new_state_tick_duration,
-            TOLERANCE,
         );
     }
 
@@ -275,11 +270,10 @@ mod test {
         assert_ne!(initial_sounds, new_sounds);
         assert_eq!(initial_sounds.len(), 2);
         assert_eq!(new_sounds.len(), 1);
-        assert_duration_tolerance(
+        assert_duration(
             "evaluation time",
-            scream_info.actual_duration(),
+            scream_info.playing_duration(),
             new_state_tick_duration,
-            TOLERANCE,
         );
     }
 

@@ -159,10 +159,9 @@ impl Responder<State> for Actuators {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::testutil::{assert_duration_tolerance, MediaInfo, WILHELM_SCREAM};
+    use crate::testutil::{assert_duration, MediaInfo, WILHELM_SCREAM};
     use std::thread::yield_now;
     use std::time::{Duration, Instant};
-    const TOLERANCE: Duration = Duration::from_millis(250);
 
     #[test]
     fn responder_state_changes_to_idle_when_ring_finished() {
@@ -192,7 +191,7 @@ mod test {
 
         // then
         let actual_duration = time_after.duration_since(time_before);
-        assert_duration_tolerance("ring duration", ring_duration, actual_duration, TOLERANCE);
+        assert_duration("ring duration", ring_duration, actual_duration);
         assert_eq!(state_initial, ResponderState::Running);
         assert_eq!(state_after, ResponderState::Idle);
     }
@@ -229,12 +228,7 @@ mod test {
 
         // then
         let actual_duration = time_after.duration_since(time_before);
-        assert_duration_tolerance(
-            "scream duration",
-            expected_duration,
-            actual_duration,
-            TOLERANCE,
-        );
+        assert_duration("scream duration", expected_duration, actual_duration);
         assert_eq!(state_initial, ResponderState::Running);
         assert_eq!(state_after, ResponderState::Idle);
     }

@@ -74,8 +74,6 @@ impl Player {
             .recv_timeout(READ_DURATION_TIMEOUT)
             .map_err(|_| format_err!("Could not obtain media duration: {:?}", file.as_ref()))?;
 
-        player.pause();
-
         Ok(Player {
             media,
             player,
@@ -233,65 +231,220 @@ impl Player {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    use crate::testutil::{assert_duration, MediaInfo, TEST_MUSIC, WILHELM_SCREAM};
+
     use std::thread::sleep;
     use std::time::{Duration, Instant};
 
+    /// Checks that the player does not report to be playing before play
+    /// was called. Playing time also should not increase.
     #[test]
-    fn playing_lifecycle() {
+    fn no_progress_before_play() {
         // given
-        let mut player =
-            Player::new("test/A Good Bass for Gambling.mp3").expect("Could not make player");
-        let play_start_time = Instant::now();
-        let end_offset = Duration::from_millis(100);
-        let seek_pos = player.duration() - end_offset;
-        let grace_time_end = Duration::from_millis(300);
+        const WAIT_TIME: Duration = Duration::from_millis(300);
 
         // when
+        let player = Player::new(TEST_MUSIC).expect("could not make player");
         let played_before_play = player.played();
-        player.play().expect("Could not play");
-        assert!(player.playing().unwrap());
+        let playing_before_play = player
+            .playing()
+            .expect("could not check if playing before play");
 
-        while player.playing().unwrap() && play_start_time.elapsed() < Duration::from_secs(1) {
-            sleep(Duration::from_secs(1))
-        }
-        assert!(play_start_time.elapsed() > Duration::from_secs(1));
+        sleep(WAIT_TIME);
 
-        player.pause().unwrap();
-        assert!(!player.playing().unwrap());
-        sleep(PAUSE_DIRTY_TIMEOUT);
-        assert!(!player.playing().unwrap());
-
-        player.play().unwrap();
-        assert!(player.playing().unwrap());
-        sleep(PAUSE_DIRTY_TIMEOUT);
-        assert!(player.playing().unwrap());
-
-        player.seek(seek_pos);
-        assert_eq!(player.played(), seek_pos);
-        assert!(player.playing().unwrap());
-
-        sleep(end_offset + grace_time_end);
-        let playing_after_end = player.playing().unwrap();
+        let played_before_play_after_wait = player.played();
+        let playing_before_play_after_wait = player
+            .playing()
+            .expect("could not check if playing before play");
 
         // then
-        assert_eq!(played_before_play, Duration::from_millis(0));
+        assert_eq!(
+            played_before_play,
+            Duration::from_millis(0),
+            "Expected zero playing time before play"
+        );
+        assert_eq!(
+            played_before_play_after_wait,
+            Duration::from_millis(0),
+            "Expected zero playing time before play, even when waiting (no autoplay)"
+        );
+        assert!(
+            !playing_before_play,
+            "Expect playing to be false before play"
+        );
+        assert!(
+            !playing_before_play_after_wait,
+            "Expect playing to be false before play, even when waiting (no autoplay)"
+        );
+    }
+
+    /// Starts playing and checks if behaves normally for the first second.
+    /// Then pauses the player. Waits a bit and checks if it is still paused.
+    #[test]
+    fn play_then_pause() {
+        // given
+        const PLAY_TIME: Duration = Duration::from_millis(500);
+        const WAIT_TIME_AFTER_PAUSE: Duration = Duration::from_millis(600);
+        let media_info = MediaInfo::obtain(TEST_MUSIC).unwrap();
+        let expected_play_time_minus_loading_lag = PLAY_TIME - media_info.buffering_lag();
+
+        // when
+        let mut player = Player::new(TEST_MUSIC).expect("could not make player");
+        player.play().expect("could not play");
+
+        let played_after_play = player.played();
+        let playing_after_play = player
+            .playing()
+            .expect("could not check if playing after play");
+
+        sleep(PLAY_TIME);
+
+        let played_after_play_and_wait = player.played();
+        let playing_after_play_and_wait = player
+            .playing()
+            .expect("could not check if playing after play and waiting");
+
+        player.pause().expect("could not pause");
+
+        let played_after_pause = player.played();
+        let playing_after_pause = player.playing().unwrap();
+
+        sleep(WAIT_TIME_AFTER_PAUSE);
+
+        let played_after_pause_and_wait = player.played();
+        let playing_after_pause_and_wait = player
+            .playing()
+            .expect("could not check if playing before play");
+
+        // then
+        assert_eq!(
+            played_after_play,
+            Duration::from_millis(0),
+            "Expected no progress immediately after playing"
+        );
+        assert_duration(
+            "playback position",
+            expected_play_time_minus_loading_lag,
+            played_after_play_and_wait,
+        );
+        assert!(
+            playing_after_play,
+            "Expected player to immediately report to be playing after calling play"
+        );
+        assert!(
+            playing_after_play_and_wait,
+            "Expected player to still be playing after playing for half a second"
+        );
+        assert_duration(
+            "playing time after pausing",
+            played_after_play_and_wait,
+            played_after_pause,
+        );
+        assert!(
+            !playing_after_pause,
+            "Expected player to not report being played after pausing"
+        );
+        assert!(
+            !playing_after_pause_and_wait,
+            "Expected player to not report being played after pausing and then waiting a bit"
+        );
+        assert_eq!(
+            played_after_pause, played_after_pause_and_wait,
+            "Expected playing time not to change when waiting after pause"
+        );
+    }
+
+    /// Checks that playing a media file of a known duration does
+    /// not take significantly longer to actually play.
+    #[test]
+    fn playing_duration_wilhelm_scream() {
+        // given
+        const PLAY_CHECK_INTERVAL: Duration = Duration::from_millis(10);
+        let expected_duration = MediaInfo::obtain(WILHELM_SCREAM)
+            .expect("could not inspect wilhelm scream")
+            // buffering lag is acceptable and platform dependent, measure it first
+            // so we have an estimate how much needs to be compensated
+            .playing_duration();
+        let max_play_loop_time = expected_duration + Duration::from_secs(2);
+
+        // when
+        let mut player = Player::new(WILHELM_SCREAM).expect("could not make player");
+        let player_start_time = Instant::now();
+        player.play().expect("could not play");
+        while player_start_time.elapsed() < max_play_loop_time && player.playing().unwrap() {
+            sleep(PLAY_CHECK_INTERVAL);
+        }
+        let playing_time = player_start_time.elapsed();
+
+        // then
+        assert_duration(
+            "wilhelm scream playing time",
+            expected_duration,
+            playing_time,
+        );
+    }
+
+    /// Starts playing and fast forwards to near the end.
+    /// Checks if stops after reaching the end.
+    #[test]
+    fn fast_forward() {
+        // given
+        const END_OFFSET: Duration = Duration::from_millis(100);
+        const MAX_PLAY_LOOP_TIME: Duration = Duration::from_secs(2);
+        const PLAY_CHECK_INTERVAL: Duration = Duration::from_millis(10);
+        const WAIT_TIME_AFTER_END: Duration = PAUSE_DIRTY_TIMEOUT;
+
+        let media_duration = MediaInfo::obtain(TEST_MUSIC).unwrap().media_duration();
+        let seek_pos = media_duration - END_OFFSET;
+
+        // when
+        let mut player = Player::new(TEST_MUSIC).expect("Could not make player");
+
+        player.play().expect("Could not play");
+        player.seek(seek_pos);
+
+        let play_start_time = Instant::now();
+        while player.playing().unwrap() && play_start_time.elapsed() < MAX_PLAY_LOOP_TIME {
+            sleep(PLAY_CHECK_INTERVAL);
+        }
+        let playing_time = play_start_time.elapsed();
+        let played_time = player.played();
+        let playing_after_end = player.playing().unwrap();
+
+        sleep(WAIT_TIME_AFTER_END);
+
+        let played_time_after_wait = player.played();
+        let playing_after_end_after_wait = player.playing().unwrap();
+
+        // then
         assert!(
             !playing_after_end,
             "Player should be paused after reaching the end of the media"
         );
+        assert_duration(
+            "playing time after seeking near end",
+            END_OFFSET,
+            playing_time,
+        );
+        assert_eq!(
+            played_time, media_duration,
+            "Expected player to report having played exactly the media length"
+        );
+        assert_eq!(playing_after_end, playing_after_end_after_wait);
+        assert_eq!(played_time, played_time_after_wait);
     }
 
     #[test]
     fn can_rewind_after_finished() {
         // given
-        let mut player = Player::new(crate::testutil::TEST_MUSIC).expect("Could not make player");
-
         let seek_from_end = Duration::from_millis(100);
         let load_grace_time = Duration::from_millis(2000);
-        let seek_pos = player.duration() - seek_from_end;
+        let seek_pos = MediaInfo::obtain(TEST_MUSIC).unwrap().media_duration() - seek_from_end;
         let wait_after_rewind_time = Duration::from_millis(500);
 
         // when
+        let mut player = Player::new(TEST_MUSIC).expect("Could not make player");
         player.seek(seek_pos);
         let played_before_play = player.played();
         player.play().expect("Could not play");

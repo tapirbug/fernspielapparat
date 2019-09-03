@@ -261,8 +261,7 @@ mod test {
     use super::*;
     use crate::acts::{Actuators, SoundSpec};
     use crate::testutil::{
-        actual_speech_time, assert_duration, assert_duration_tolerance, MediaInfo, TEST_MUSIC,
-        WILHELM_SCREAM,
+        actual_speech_time, assert_duration, MediaInfo, TEST_MUSIC, WILHELM_SCREAM,
     };
     use std::thread::yield_now;
     use std::time::Duration;
@@ -373,7 +372,6 @@ mod test {
     fn load_other_states() {
         // given
         // VLC loading takes some time, and so does picking up that it has finished
-        const TOLERANCE: Duration = Duration::from_millis(250);
         let initial_states = [
             State::builder()
                 .id("initial initial")
@@ -426,7 +424,7 @@ mod test {
             active_after_load,
             "expected update to return true after loading new states"
         );
-        assert_duration_tolerance("execution time", scream_duration, duration, TOLERANCE);
+        assert_duration("execution time", scream_duration, duration);
     }
 
     fn null_actuators() -> Actuators {
