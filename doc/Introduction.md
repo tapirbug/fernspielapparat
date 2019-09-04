@@ -53,7 +53,12 @@ and over:
     # Contents of phonebook.yaml
     states:
       hello:
+        sounds:
+          - hello
+    sounds:
+      hello:
         speech: Hello, World!
+        loop: true
 
 When we write `#`, we can make some notes that do not change
 the meaning of the file. We then start off the real content
@@ -61,8 +66,9 @@ with a label `states:` that says we will now write down the
 names of states, indented by two spaces, with a colon at the
 end, in this case `hello:`. We then write down, each line
 indented by four spaces, a category of things where this
-state is _special_, in this case `speech:`, that is, we let
-the machine talk some text that we write down after the colon.
+state is _special_, in this case `sounds:`, that is, we let
+the machine talk some text that we write down in the `sounds:`
+section below.
 
 You can write multiple lines of speech by starting with a `>`
 and then continuing for a few lines, indented by two more
@@ -76,14 +82,21 @@ machine like lighting, check it out:
     # Contents of phonebook.yaml
     states:
       countdown:
+        sounds:
+          - countdown
+      destruction:
+        sounds:
+          - destruction
+        lights:
+          excitement: 100
+    sounds:
+      countdown:
         speech: >
           Three..
           Two..
           *One*..
       destruction:
         speech: Self-destruction initiated <ring>
-        lights:
-          excitement: 100
 
 You can see here that we now have two states. That's cool,
 but the first one keeps repeating forever, how do we change
@@ -100,18 +113,27 @@ exactly what we need for the example above:
     # Contents of phonebook.yaml
     states:
       countdown:
-        speech: >
-          Three..
-          Two..
-          *One*..
+        sounds:
+          - countdown
       destruction:
-        speech: Self-destruct sequence initiated <ring>
+        sounds:
+          - destruction
         lights:
           excitement: 100
     
     transitions:
       countdown:
         end: destruction
+
+    # Sounds did not change
+    sounds:
+      countdown:
+        speech: >
+          Three..
+          Two..
+          *One*..
+      destruction:
+        speech: Self-destruction initiated <ring>
 
 The `dial` sensor can have different transitions depending
 on the number dialed. We can use it for this consentful
@@ -122,18 +144,11 @@ self-destruction version with an undo-feature:
       announcement:
         speech: Dial zero to initiate self-destruction...
       countdown:
-        speech: >
-          Initiating self-destruct sequence in T minus three seconds
-          Three..
-          Two..
-          *One*..
-        lights:
-          excitement: 50
+        sounds:
+          - countdown
       destruction:
-        speech: >
-            Self-destruct sequence initiated
-            <ring>
-            Dial *one* to abort self-destruction.
+        sounds:
+          - destruction
         lights:
           excitement: 100
     
@@ -145,7 +160,18 @@ self-destruction version with an undo-feature:
         end: destruction
       destruction:
         dial:
-          1: destruction
+          1: announcement
+
+    sounds:
+      announcement:
+        speech: Dial zero to initiate self-destruction...
+      countdown:
+        speech: >
+          Three..
+          Two..
+          *One*..
+      destruction:
+        speech: Self-destruction initiated <ring>
 
 ## Reading on
 This is basically it, you know almost everything there is
