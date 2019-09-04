@@ -7,6 +7,33 @@
 # actuators, e.g. the text to speak.
 states:
   announcement:
+    sounds:
+      - announcement
+
+  # New state starts here
+  techsupport:
+    # No lights here, all at 0 by default
+    speech: "Tech support is currently unreachable."
+
+  # refunds is also a state
+  refunds:
+    # Here we just write the default light value explicitly,
+    # no effect
+    lights:
+      mood: 0
+    sounds:
+      - no_refunds
+
+  # and history is a state
+  history:
+    lights:
+      party: 100
+    sounds:
+      - rickroll
+
+  # this state is not used, it contains draft features
+  # that are not implemented or not finished yet.
+  experimental:
     # Lights configuration, as numbers along dimensions
     # like "excitement" or "power". If nothing is
     # specified, everything is left at 0 (neutral).
@@ -36,6 +63,14 @@ states:
       # try to make the room cleaner-looking. May also
       # have no effect at all, depending on the  lights
       mood: 0
+
+# From the states we just defined, we pick one that
+# is the start of the story. If you do not define
+# a start state, the first one is picked automatically.
+initial: announcement
+
+sounds:
+  announcement:
     # We will speak some text embedded in this file.
     # You can _emphasize_ and make pauses with more than
     # one consecutive dot, e.g. dramatic.... pause will
@@ -58,37 +93,15 @@ states:
       be in the public domain or something.. Definitely
       something soothing. You'll like it.
 
-    # For long texts, you may want to put the text into an
-    # extra file in your phone book, which you can then
-    # link from here, e.g.:
-    # speech_file: "your_text.txt"
-
     # The above text will be spoken by the computer,
     # but you can instead include an audio file in a
     # common format like .wav or .ogg and the computer
     # will play it instead of reading it out:
-    # speech_file: announcement.ogg
+    # file: announcement.ogg
 
     # If you have both speech and speech_file, the
     # speech one is ignored and only speech_file is used
-
-  # New state starts here
-  techsupport:
-    # No lights here, all at 0 by default
-    speech: "Tech support is currently unreachable."
-
-  # refunds is also a state
-  refunds:
-    # Here we just write the default light value explicitly,
-    # no effect
-    lights:
-      mood: 0
-    speech: "Hahahaha. Hahahahaha. Ha.. Ha.. No. No. Absolutely not."
-
-  # and history is a state
-  history:
-    lights:
-      party: 100
+  rickroll:
     speech: >
       Never gonna give you up.
       Never gonna let you down.
@@ -96,11 +109,10 @@ states:
       Never gonna make you cry.
       Never gonna say goodbye.
       Never gonna tell a lie and hurt you
-
-# From the states we just defined, we pick one that
-# is the start of the story. If you do not define
-# a start state, the first one is picked automatically.
-initial: announcement
+  tech_unreachable: 
+    speech: "Tech support is currently unreachable."
+  no_refunds:
+    speech: "Hahahaha. Hahahahaha. Ha.. Ha.. No. No. Absolutely not."
 
 # The current state repeats until the conditions for
 # a transition are met. Conditions use sensors
