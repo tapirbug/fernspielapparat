@@ -6,6 +6,11 @@ compile it for deployment on a Raspberry Pi 2 device.
 ## Compile for Your Own Computer
 The following steps enable you to compile the runtime locally.
 
+### Get the Source Code
+If you have not done so already, clone the source code repository:
+
+    git clone https://github.com/krachzack/fernspielapparat.git
+
 ### Build System
 The rust build system cargo is required. Download it with
 [rustup](https://rustup.rs/) or your system package manager.

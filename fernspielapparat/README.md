@@ -1,10 +1,9 @@
 # fernspielapparat
-This is the source code for the fernspielapparat runtime. It is
-the component running on the target device that enables users to
-play phonebooks.
+This is the fernspielapparat runtime. It is the component running
+on the target device that enables users to play phonebooks.
 
 General information on the fernspielapparat project is available
-in the [top-level readme](../README.md).
+in the [Introduction](https://github.com/krachzack/fernspielapparat/blob/master/doc/Introduction.md).
 
 The runtime loads and evaluates phonebooks. For this, it accesses
 hardware dials through an I2C protocol. System keyboard input is
@@ -15,6 +14,18 @@ is supported through an I2C protocol.
 ## Installing
 The runtime runs on Raspberry Pi 2 or similar systems and also on
 common desktop operating systems.
+
+Binary releases contain the runtime as an executable file
+`fernspielapparat` (or `fernspielapparat.exe`). You can run
+it directly and move it anywhere you like to install it.
+
+To make `fernspielapparat` available globally, you can add the
+containing directory to your `PATH` environment variable or
+move the runtime to some directory that you know is on the
+`PATH`, e.g. `/usr/bin` on many systems. Instead of moving,
+you can place a symbolic link in the target directory - this
+will make it easier for you to switch between versions later
+on.
 
 To build and install the runtime yourself, see the
 [compilation guide](COMPILE.md).
