@@ -31,15 +31,31 @@ Source: Download from [freemusicarchive.org](http://freemusicarchive.org/music/K
 ## Dynamically Linked Libraries
 Dynamically linked libraries.
 
-### VLC
-Use: Compiled binary dynamically links to `libvlc` using the `vlc-rs` bindings.
+### libvlc
+Use: Compiled binary dynamically links to system-wide `libvlc` using the `vlc-rs` bindings.
+
+Path in project: n/a
+
+Path in released tarball: n/a
 
 Statically linked: no
+
+License: LGPL
+
+URL: https://www.videolan.org/vlc
 
 ### espeak
 Use: text-to-speech through its CLI via `tavla` crate
 
+Path in project: n/a
+
+Path in released tarball: n/a
+
 Statically linked: no
+
+License: GPLv3
+
+URL: http://espeak.sourceforge.net/
 
 ## Rust Crates
 Statically linked rust crates. For the specific versions in use,
