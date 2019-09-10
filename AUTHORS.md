@@ -6,7 +6,7 @@ code.
 ## Assets
 Sound samples used for tests and the embedded demo phonebook.
 
-### Erokia - MSfxp3 Sounds (Pack 3) » MSfxP3 - 15 (Thunky Bass) 
+### Erokia - MSfxp3 Sounds (Pack 3) / MSfxP3 - 15 (Thunky Bass)
 Use: As a short sample for unit, integration and acceptance tests.
 
 Path in project: `test/482381__erokia__msfxp3-15-thunky-bass.wav`
@@ -184,5 +184,32 @@ Use: Websocket functionality used for the remote control server.
 Statically linked: yes
 
 License: MIT
+
+Source: crates.io
+
+### i2c-linux
+Use: Communication with hardware phone, only used on Linux.
+
+Statically linked: yes
+
+License: MIT
+
+Source: crates.io
+
+### env_logger
+Use: Logging with the rust test framework, only used in testing builds.
+
+Statically linked: yes
+
+License: MIT/Apache-2.0
+
+Source: crates.io
+
+### rand
+Use: Generate random ports in tests.
+
+Statically linked: yes
+
+License: MIT/Apache-2.0
 
 Source: crates.io
