@@ -33,7 +33,7 @@ function generate_source_link {
 https://github.com/krachzack/fernspielapparat" > $RELEASE_DIR/SOURCE
 }
 
-echo "Building for host system architecture ..." \
+echo "Building for host system architecture ..." && \
 cargo build --release && \
 echo "Clearing output directory ..." && \
 clean && \
