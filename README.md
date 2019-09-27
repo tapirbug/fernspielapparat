@@ -23,6 +23,46 @@ is supported through an I2C protocol.
 The runtime runs on Raspberry Pi 2 or similar systems and also on
 common desktop operating systems.
 
+#### Step 1: Install dependencies
+The application needs other Software to run, so the first
+step is to install these dependencies.
+
+##### Dependencies for what?
+For speech synthesis, installing `espeak` is recommended.
+For systems other than Windows and Mac, it is required.
+To play music and speech to the user, VLC is required.
+
+#### Dependencies: Linux
+Make sure `vlc` or `cvlc` is installed through your
+favorite package manager. An I2C kernel module is
+required for the hardware bell and hardware dial.
+`espeak` is also required.
+
+#### Dependencies: Windows
+Install VLC through their web site if you have not done
+so already. Then, make sure the VLC installation directory
+is on the `Path` environment variable, so the runtime
+can find it. On my system, `libvlc.dll` is located in
+`C:\Program Files\VideoLAN\VLC`. Check yourself and
+then add it to `Path` through system settings.
+
+On a german locale, traverse through the screens like
+this after you have found "Systemumgebungsvariablen bearbeiten"
+in the system settings:
+
+![setting Path on Windows to find libvlc.dll](doc/vlc-path-windows.png)
+
+If this was too much German for you, there are a lot of
+guides on the internet for setting environment variables
+on Windows.
+
+Installing `espeak` and adding it to your path is recommended.
+
+#### Dependencies: Mac
+Make sure VLC is installed on your system. `espeak` is
+recommended, but not required.
+
+#### Step 2: Install _fernspielapparat_ Executable
 Binary releases contain the runtime as an executable file
 `fernspielapparat` (or `fernspielapparat.exe`). You can run
 it directly and move it anywhere you like to install it.

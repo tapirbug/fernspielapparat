@@ -19,7 +19,7 @@ _libvlc_ also needs to be available on your system. For most
 Linux systems it is sufficient to install VLC through the
 package manager. On Mac, make sure VLC is in `/Applications`
 and check out _Linker Paths on Mac OS_ in the next section.
-Windows is not yet supported, sorry.
+Windows requires some extra setup, sorry, see below.
 
 For running, `espeak` should be on the path. For Windows and Mac,
 there are fallback solutions in place, but installing `espeak`
@@ -69,6 +69,44 @@ on your mac:
     }
 
 When shipping, you can provide the dylib and the plugin directory inside the app bundle, so the env variables are not needed.
+
+### Caveat: Getting `libvlc.dll` and `vlc.lib` on Windows
+This only applies if you are building for Windows.
+
+Install VLC through their web site if you have not done
+so already. Then, make sure the VLC installation directory
+is on the `Path` environment variable, so the runtime
+can find it. On my system, `libvlc.dll` is located in
+`C:\Program Files\VideoLAN\VLC`. Check yourself and
+then add it to `Path` through system settings.
+
+On a german locale, progress through the screens like
+this after you have found "Systemumgebungsvariablen bearbeiten"
+in the system settings, adding your systems path:
+
+![setting Path on Windows to find libvlc.dll](doc/vlc-path-windows.png)
+
+If this was too much German for you, there are a lot of
+guides on the internet for setting environment variables
+on Windows.
+
+Since `vlc.lib` does not ship with VLC, it has to be either generated
+or you have to build VLC yourself. Place it next to the DLL, so it
+can be used for linking the executable.
+
+There is a great [guide](https://wiki.videolan.org/GenerateLibFromDll/)
+in the VLC wiki that describes how to generate it using Visual Studio
+command line tools from an existing VLC installation. Use the developer
+command line prompt from your Visual Studio installation to run the commands
+described there. Take care to use `x64` instead of the `x86` in the guide.
+
+To build, I recommend using the `stable-x86_64-pc-windows-gnu` toolchain
+that you can obtain with `rustup`. You need to get `gcc` on your path
+for it to work. You can get it through some channel such as MinGW or CygWin.
+
+`stable-x86_64-pc-windows-msvc` gave
+me some undefined references to `vsnprintf` when linking to VLC, though
+I assume this could somehow be fixed if you need to use that toolchain.
 
 ### Compiling
 `cargo build --release` generates an executable in the
@@ -123,6 +161,14 @@ passes, the set may change:
     liblzma.so.5.2.2
 
 When in doubt, check which libraries your target system has installed.
+
+### `build.sh`
+Builds release binaries and packages them into a versioned `.tar.gz`
+archive along with documentation and some metadata. The resulting
+archive is placed in the release directory and includes version,
+target operating system and architecture into its name. For example,
+a 64bit Windows 10 system gives me:
+`release/fernspielapparat-0.1.0-msys_nt-10.0-x86_64.tar.gz`.
 
 ### `deploy.sh`
 A script is included that combines building and copying the binary to
