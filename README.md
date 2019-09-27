@@ -95,5 +95,5 @@ Use `fernspielapparat --help` for an overview of available
 options.
 
 ## License
-The fernspielapparat project is licensed under the GPLv3, since it
-internally depends on espeak, which uses that license.
+The fernspielapparat project is licensed under the GPLv3.
+See [LICENSE](LICENSE) for details.
