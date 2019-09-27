@@ -4,8 +4,6 @@
 //! Exports `AppBuilder`, `App` and `Phone` as the only
 //! interface to the core functionality for client code.
 
-#![feature(drain_filter)]
-
 #[cfg(test)]
 mod testutil;
 

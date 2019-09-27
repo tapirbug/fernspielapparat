@@ -132,9 +132,23 @@ impl RelayWorker {
 
     fn broadcast_message(&mut self, msg: &OwnedMessage) {
         trace!("broadcasting message {:?}", msg);
-        self.connections
-            .drain_filter(|(h, c)| !Self::try_send(*h, c, msg))
-            .for_each(|(_, dropped)| Self::shutdown(dropped));
+
+        // more efficient but nightly-only:
+        // self.connections
+        //    .drain_filter(|(h, c)| !Self::try_send(*h, c, msg))
+        //    .for_each(|(_, dropped)| Self::shutdown(dropped));
+
+        let mut i = 0;
+        while i < self.connections.len() {
+            let (h, c) = &mut self.connections[i];
+            if Self::try_send(*h, c, msg) {
+                // could send, next
+                i += 1;
+            } else {
+                // could not send, remove and backshift
+                Self::shutdown(self.connections.remove(i).1);
+            }
+        }
     }
 
     fn unicast_message(&mut self, handle: ConnectionHandle, msg: &OwnedMessage) {
