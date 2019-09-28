@@ -13,7 +13,7 @@ CROSS_TRIPLE="arm-unknown-linux-gnueabihf"
 cd $(cd -P -- "$(dirname -- "$0")" && pwd -P) && \
 
 # And build for CROSS_TRIPLE
-cargo build --verbose --release --target=$CROSS_TRIPLE || exit 1
+./build.sh $CROSS_TRIPLE || exit 1
 
 # Copy to Raspberry Pi via scp
 echo "Build successful, deploying binary to $RPI_HOSTNAME..."
