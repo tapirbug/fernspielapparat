@@ -21,7 +21,8 @@ use log::{debug, info, warn};
 use std::process::exit;
 
 /// When `--serve` is used without a bind point, use this.
-const DEFAULT_BIND_ADDRESS: &str = "127.0.0.1:38397";
+const DEFAULT_ADDRESS: &str = "0.0.0.0";
+const DEFAULT_PORT: &str = "38397";
 
 fn main() {
     if bootstrap().is_err() {
@@ -36,55 +37,105 @@ fn bootstrap() -> Result<(), Error> {
         .author(crate_authors!())
         .arg(
             Arg::with_name("phonebook")
-                .help("Path to the phone book to use")
-                .required(true)
+                .help("Phone book to run at startup")
+                .long_help("Path to a phone book to load and run at startup.")
+                .required_unless_one(&["serve", "serve_address", "serve_port", "demo", "test"])
                 .conflicts_with("demo")
-                .conflicts_with("test")
-                .conflicts_with("serve"),
+                .conflicts_with("test"),
         )
         .arg(
             Arg::with_name("serve")
                 .short("s")
                 .long("serve")
+                .help("Host WebSockets server for remote control")
+                .long_help(&format!(
+                    "Starts up a WebSockets server for remote control, \
+                     executing in the background. \
+                     Hosts on {address}:{port} per default. \
+                     See --addr and --port to override bind address or port. \
+                     Any phonebook provided via path is executed at startup. \
+                     Without a startup phonebook, the runtime remains silent until \
+                     a phonebook has been uploaded via remote control.",
+                    address = DEFAULT_ADDRESS,
+                    port = DEFAULT_PORT
+                ))
+                .conflicts_with("test"),
+        )
+        .arg(
+            Arg::with_name("serve_address")
+                .help("WebSockets server bind address")
+                .long_help(&format!(
+                    "Sets the bind address to host a WebSockets server for remote control on. \
+                     Implies --serve. \
+                     Defaults to {addr}, if --serve is used without an explicit address.",
+                    addr = DEFAULT_ADDRESS
+                ))
+                .short("a")
+                .long("addr")
                 .takes_value(true)
-                .default_value(DEFAULT_BIND_ADDRESS)
-                .value_name("HOSTNAME_AND_PORT")
-                .hide_default_value(true)
-                .help(&format!(
-                    "Starts up a WebSockets server for remote control on the \
-                     specified hostname and port, or \"{default}\" if no value specified.",
-                    default = DEFAULT_BIND_ADDRESS
-                )),
+                .value_name("ADDRESS")
+                .default_value_if("serve", None, DEFAULT_ADDRESS)
+                .default_value_if("serve_port", None, DEFAULT_ADDRESS),
+        )
+        .arg(
+            Arg::with_name("serve_port")
+                .help("WebSockets server bind port")
+                .long_help(&format!(
+                    "Sets the port to host a WebSockets server for remote control on. \
+                     Implies --serve. \
+                     Defaults to {port}, if --serve is used without an explicit port.",
+                    port = DEFAULT_PORT
+                ))
+                .short("p")
+                .long("port")
+                .takes_value(true)
+                .value_name("PORT")
+                .default_value_if("serve", None, DEFAULT_PORT)
+                .default_value_if("serve_address", None, DEFAULT_PORT),
         )
         .arg(
             Arg::with_name("demo")
                 .short("d")
                 .long("demo")
-                .help("Loads a demo phonebook instead of a file"),
+                .help("Loads a demo phonebook instead of a file")
+                .long_help("Loads a demo phonebook instead of a file."),
         )
         .arg(
             Arg::with_name("exit-on-terminal")
                 .long("exit-on-terminal")
-                .help(
+                .help("Terminate when reaching terminal state")
+                .long_help(
                     "Instead of starting over, exit with status 0 when reaching a terminal state.",
                 ),
         )
-        .arg(Arg::with_name("test").short("t").long("test").help(
-            "Lets the phone ring and speak for one second as a basic hardware \
-             check, then exits.",
-        ))
+        .arg(
+            Arg::with_name("test")
+                .short("t")
+                .long("test")
+                .help("Perform hardware and speech synth check, then exit")
+                .long_help(
+                    "Lets the phone ring and speak for one second as a basic hardware \
+                     check, tries to speak a sentence through speech synthesis, then exits.",
+                ),
+        )
         .arg(
             Arg::with_name("quiet")
                 .short("q")
                 .long("quiet")
-                .help("Silence warnings and errors"),
+                .help("Silence warnings and errors")
+                .long_help("Turn off logging completely, including warnings and errors."),
         )
         .arg(
             Arg::with_name("verbose")
                 .short("v")
                 .long("verbose")
                 .multiple(true)
-                .help("Print non-essential output with diagnostic information to stderr")
+                .help("Verbose logging")
+                .long_help(
+                    "Print non-essential output with diagnostic information to stderr. \
+                     Multiple occurrences increase logging verbosity. -vvv is the highest verbosity, \
+                     printing debug information."
+                )
                 .conflicts_with("quiet"),
         )
         .get_matches();
@@ -105,7 +156,7 @@ fn bootstrap() -> Result<(), Error> {
         });
 
         match result {
-            Ok(_) => debug!("Exiting after normal operation."),
+            Ok(_) => debug!("exiting after normal operation."),
             Err(ref err) => log_fatal(err),
         }
 
@@ -137,13 +188,24 @@ fn build_app(matches: ArgMatches) -> Result<App, Error> {
         Err(e) => warn!("no phone available, error: {}", e),
     }
 
-    if matches.occurrences_of("serve") > 0 {
-        let bind_to = matches
-            .value_of("serve")
-            // unwrap is safe: 127.0.0.1:38397 is specified as default value
+    let some_serve_arg_present = matches.is_present("serve")
+        || matches.occurrences_of("serve_address") > 0
+        || matches.occurrences_of("serve_port") > 0;
+    if some_serve_arg_present {
+        let bind_address = matches
+            .value_of("serve_address")
+            // unwrap is safe: 127.0.0.1 is specified as default value
             .unwrap();
+        let bind_port = matches
+            .value_of("serve_port")
+            // unwrap is safe: 38397 is specified as default value
+            .unwrap();
+        let bind_to = &format!("{addr}:{port}", addr = bind_address, port = bind_port);
 
-        debug!("starting WebSockets remote control server on {}", bind_to);
+        debug!(
+            "starting WebSockets remote control server on {bind_to}",
+            bind_to = bind_to
+        );
 
         app.serve(bind_to)?;
     }
