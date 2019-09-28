@@ -5,6 +5,6 @@ linker = "arm-linux-gnueabihf-gcc"
 ar = "arm-linux-gnueabihf-ar"
 rustflags = [
     "--verbose",
-    "-C", "link-args=-Wl,-rpath,../../vendor/arm-unknown-linux-gnueabihf/vlc/lib",
-    "-L", "native=../../vendor/arm-unknown-linux-gnueabihf/vlc/lib"
+    "-C", "link-args=-Wl,-rpath,../vendor/arm-unknown-linux-gnueabihf/vlc/lib",
+    "-L", "native=../vendor/arm-unknown-linux-gnueabihf/vlc/lib"
 ]
