@@ -19,7 +19,11 @@ serde_yaml = "0.8"
 tavla = { git = "https://github.com/krachzack/tavla.git" }
 tempfile = "3.0.7"
 vlc-rs = "0.3.0"
-websocket = "0.23.0"
+
+[dependencies.websocket]
+version = "0.23.0"
+default-features = false
+features = ["sync"]
 
 [features]
 # Long-running tests are compiled to be ignored unless this flag is set.
