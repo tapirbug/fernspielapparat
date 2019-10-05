@@ -16,6 +16,11 @@ const SET_PHONEBOOK: &str = "{
     }
 }";
 
+const DIAL_ONE: &str = "{
+    \"invoke\": \"dial\",
+    \"with\": \"1\"
+}";
+
 const START_ON_PASSIVE_EVT: &str = "---
 type: start
 initial:
@@ -36,6 +41,35 @@ const FINISH_ON_TERMINAL_EVT: &str = "---
 type: finish
 terminal:
   id: terminal";
+
+const PHONEBOOK_WITH_DIAL_TRANSITION: &str = "---
+initial: one
+states:
+  one:
+    terminal: false
+  two:
+    terminal: true
+transitions:
+  one:
+    dial:
+      1: two";
+
+const START_ON_ONE_EVT: &str = "---
+type: start
+initial:
+  id: one";
+const TRANSITION_TO_TWO_EVT: &str = "---
+type: transition
+reason:
+  dial: type 1
+from:
+  id: one
+to:
+  id: two";
+const FINISH_ON_TWO_EVT: &str = "---
+type: finish
+terminal:
+  id: two";
 
 #[test]
 fn deploy_and_then_observe_transition() {
@@ -102,6 +136,69 @@ fn deploy_and_then_observe_transition() {
     assert_eq!(
         event_finish_terminal,
         OwnedMessage::Text(FINISH_ON_TERMINAL_EVT.to_string())
+    );
+}
+
+#[test]
+fn observe_transition_from_dial() {
+    fernspielapparat::log::init_logging(Some(3));
+
+    // given
+    let port = random_port();
+
+    // when
+    let mut app = fernspielapparat::App::builder();
+    app.startup_phonebook(
+        fernspielapparat::books::from_str(PHONEBOOK_WITH_DIAL_TRANSITION).unwrap(),
+    );
+    app.serve(&format!("127.0.0.1:{port}", port = port))
+        .unwrap();
+    app.exit_on_terminal_state();
+    spawn(move || {
+        let mut app = app.build().unwrap();
+        app.run().unwrap();
+    });
+    //std::thread::sleep(std::time::Duration::from_secs(5));
+    let client = ClientBuilder::new(&format!("ws:/127.0.0.1:{port}", port = port))
+        .unwrap()
+        .add_protocol("fernspielctl")
+        .connect_insecure()
+        .expect("failed to make ws connection");
+    let (mut rx, mut tx) = client.split().unwrap();
+
+    let mut incoming = rx.incoming_messages();
+    let event_start_passive = incoming
+        .next()
+        .expect("expected message of starting at the initial state")
+        .expect("expected ok message");
+
+    tx.send_message(&OwnedMessage::Text(DIAL_ONE.to_string()))
+        .unwrap();
+
+    let event_transition_two = incoming
+        .next()
+        .expect("expected message of a transition from \"one\" to \"two\" after dial")
+        .expect("expected ok message");
+    let event_finish_terminal = incoming
+        .next()
+        .expect("expected message that the machine finished at \"terminal\"")
+        .expect("expected ok message");
+
+    tx.send_message(&OwnedMessage::Close(None)).unwrap();
+    tx.shutdown_all().unwrap();
+
+    // then
+    assert_eq!(
+        event_start_passive,
+        OwnedMessage::Text(START_ON_ONE_EVT.to_string())
+    );
+    assert_eq!(
+        event_transition_two,
+        OwnedMessage::Text(TRANSITION_TO_TWO_EVT.to_string())
+    );
+    assert_eq!(
+        event_finish_terminal,
+        OwnedMessage::Text(FINISH_ON_TWO_EVT.to_string())
     );
 }
 

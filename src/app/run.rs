@@ -3,7 +3,8 @@ use crate::books::Book;
 use crate::evt::Responder;
 use crate::phone::Phone;
 use crate::result::Result;
-use crate::senses::init_sensors;
+use crate::senses::QueueInput;
+use crate::senses::{Sensors, SensorsBuilder};
 use crate::serve::{EventPublisher, Server};
 use crate::states::State;
 
@@ -22,18 +23,24 @@ pub struct Run {
 }
 
 impl Run {
-    /// Makes the initial run, initializing the sensors and running
-    /// the given optional book.
-    ///
-    /// If `None` is passed, a passive book is used until the next
-    /// book switch.
-    pub fn new(
+    pub fn new_with_queue(
         book: Option<Book>,
         phone: Option<Arc<Mutex<Phone>>>,
         server: Option<Rc<Server>>,
+    ) -> Result<(Self, QueueInput)> {
+        let mut sensors = init_sensors(&phone);
+        let (_, queue) = sensors.queue();
+        Self::new_with_sensors(book, phone, server, sensors).map(|r| (r, queue))
+    }
+
+    fn new_with_sensors(
+        book: Option<Book>,
+        phone: Option<Arc<Mutex<Phone>>>,
+        server: Option<Rc<Server>>,
+        sensors: SensorsBuilder,
     ) -> Result<Self> {
         let book = book.unwrap_or_else(Book::passive);
-        let sensors = init_sensors(&phone);
+        let sensors = sensors.build();
         let responder = make_responder(&phone, &server, &book)?;
         let machine = Machine::new(sensors, responder, book.states());
 
@@ -85,6 +92,23 @@ impl Run {
     }
 }
 
+#[cfg(test)]
+impl Run {
+    /// Makes the initial run, initializing the sensors and running
+    /// the given optional book.
+    ///
+    /// If `None` is passed, a passive book is used until the next
+    /// book switch.
+    pub fn new(
+        book: Option<Book>,
+        phone: Option<Arc<Mutex<Phone>>>,
+        server: Option<Rc<Server>>,
+    ) -> Result<Self> {
+        let sensors = init_sensors(&phone);
+        Self::new_with_sensors(book, phone, server, sensors)
+    }
+}
+
 fn make_responder(
     phone: &Option<Arc<Mutex<Phone>>>,
     server: &Option<Rc<Server>>,
@@ -103,11 +127,22 @@ fn make_responder(
     Ok(CompositeResponder::from(responders))
 }
 
+pub fn init_sensors(phone: &Option<Arc<Mutex<Phone>>>) -> SensorsBuilder {
+    let mut sensors = Sensors::builder();
+    sensors.stdin();
+
+    if let Some(phone) = phone.as_ref() {
+        sensors.i2c_dial(phone);
+    }
+    sensors
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::books::spec::Sound as SoundSpec;
     use crate::log::init_test_logging;
+    use crate::senses::Input;
     use crate::testutil::{
         actual_speech_time, assert_duration, MediaInfo, TEST_MUSIC, WILHELM_SCREAM,
     };
@@ -277,6 +312,37 @@ mod test {
             scream_info.playing_duration(),
             new_state_tick_duration,
         );
+    }
+
+    #[test]
+    fn switch_from_queue_dial() {
+        // given
+        let mut book = Book::builder();
+        book.state(
+            State::builder()
+                .id("1")
+                .name("1")
+                .input(Input::pick_up(), 1)
+                .build(),
+        )
+        .state(State::builder().id("2").name("2").terminal(true).build());
+        let book = book.build();
+
+        // when
+        let (mut run, input) = Run::new_with_queue(Some(book), None, None).unwrap();
+        let initially_running = run.tick();
+        input.send(Input::pick_up()).ok();
+        let running_after_pick_up = run.tick();
+
+        // then
+        assert!(
+            initially_running,
+            "Expected initial state to remain in place"
+        );
+        assert!(
+            !running_after_pick_up,
+            "Sent asnychroneous pick up, but did not see expected transition to terminal state"
+        )
     }
 
     fn speech(speech: &str) -> SoundSpec {

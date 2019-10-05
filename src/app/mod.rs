@@ -2,6 +2,7 @@ mod builder;
 mod run;
 
 use crate::result::Result;
+use crate::senses::QueueInput;
 use crate::serve::Request;
 use crate::serve::Server;
 
@@ -32,6 +33,7 @@ pub struct App {
     /// Behavior when phonebook reaches a terminal state.
     terminal_state_behavior: TerminalStateBehavior,
     termination_flag: Arc<AtomicBool>,
+    control: QueueInput,
 }
 
 #[derive(Debug, PartialEq)]
@@ -94,6 +96,12 @@ impl App {
             Request::Reset => self.run.reset(),
             // stop current phonebook and launch the sent one
             Request::Run(new_book) => self.run.switch(new_book)?,
+            Request::Dial(input) => {
+                debug!("remote dial: {:?}", input);
+                input.into_iter().for_each(|i| {
+                    self.control.send(i).ok();
+                })
+            }
         };
 
         Ok(())

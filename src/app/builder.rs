@@ -109,8 +109,12 @@ impl Builder {
         } = self;
         let server = server.map(Rc::new);
 
+        let (run, control) =
+            Run::new_with_queue(startup_book, phone, server.as_ref().map(Rc::clone))?;
+
         let app = App {
-            run: Run::new(startup_book, phone, server.as_ref().map(Rc::clone))?,
+            run,
+            control,
             server,
             terminal_state_behavior,
             termination_flag,
