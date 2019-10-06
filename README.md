@@ -1,25 +1,47 @@
 # fernspielapparat
-Documentation and code of the _Fernspielapparat_ project live here.
+Documentation and code of the _fernspielapparat_ runtime live here.
 
-It is a story telling device and you can learn more about what it
-is and how you can work with it in the [Introduction](https://github.com/krachzack/fernspielapparat/blob/master/doc/Introduction.md).
-When you have learned the basics you may want to check out some of
-the [examples](examples/).
+_fernspielapparat_ is a story telling device that gives you a
+text adventure-like experience talking to retro phone.
 
-## fernspielapparat runtime
-The source code in this repository is used to build the runtime.
-It is the component running on the target device that enables
-users to play phonebooks.
-
-It can also be used for development and testing of phonebooks.
-
-The runtime loads and evaluates phonebooks. For this, it accesses
+Games on the _fernspielapparat_ are packaged into _phonebooks_ and
+the runtime loads and evaluates them. For this, it accesses
 hardware dials through an I2C protocol. System keyboard input is
 supported on systems without a dial installed. It provides speech
 output through _espeak_ and _libvlc_. An optional hardware bell
-is supported through an I2C protocol.
+is supported through an I2C protocol. The _fernspielapparat_ can
+be controlled remotely over the network.
+
+## Getting Started
+The source code in this repository is used to build the _fernspielapparat_
+runtime. It is the core software component running either on the
+target device or on your own computer and enables you to play and test
+stories stored in phonebooks.
+
+To create your own phonebooks, check out the
+[fernspieleditor](https://krachzack.github.io/fernspieleditor/).
+You can build your story there and then send it to a
+_fernspielapparat_ over the network.
+
+To get a _fernspielapparat_ up and running, the easiest way is to
+download a recent release of the [weichspielapparat](https://github.com/krachzack/weichspielapparat),
+which is a graphical user interface that can run on your computer.
+The only required setup is to install VLC first, the
+_weichspielapparat_ will take care of the rest.
+
+To learn more about the inner workings of the phonebook format,
+please read the [specification](doc/Phonebook Spec.md).
 
 ### Installing
+So you want to install the runtime yourself? This may not be necessary
+if you can use the
+[weichspielapparat](https://github.com/krachzack/weichspielapparat),
+which gives you a graphical user interface for testing and is generally
+easier for you to use.
+If you want to run the command line interface for advanced usage or
+if you want to build your own exhibition with the fernspielapparat runtime,
+please read ahead!
+
 The runtime runs on Raspberry Pi 2 or similar systems and also on
 common desktop operating systems.
 
@@ -46,6 +68,9 @@ can find it. On my system, `libvlc.dll` is located in
 `C:\Program Files\VideoLAN\VLC`. Check yourself and
 then add it to `Path` through system settings.
 
+Note: adding to the path is not necessary, if you are using
+the runtime through _weichspielapparat_.
+
 On a german locale, traverse through the screens like
 this after you have found "Systemumgebungsvariablen bearbeiten"
 in the system settings:
@@ -62,10 +87,20 @@ Installing `espeak` and adding it to your path is recommended.
 Make sure VLC is installed on your system. `espeak` is
 recommended, but not required.
 
+Two environment variables are requied for _fernspielapparat_
+to find VLC: `DYLD_LIBRARY_PATH` needs to contain the directory
+of the VLC executable inside its `.app` bundle. also, you need
+to specify the VLC plugin directory with `VLC_PLUGIN_PATH`.
+If this information is not available, the runtime will fail to
+start.
+
 #### Step 2: Install _fernspielapparat_ Executable
-Binary releases contain the runtime as an executable file
-`fernspielapparat` (or `fernspielapparat.exe`). You can run
-it directly and move it anywhere you like to install it.
+Binary [releases](https://github.com/krachzack/fernspielapparat/releases)
+contain the runtime as an executable file `fernspielapparat`
+(or `fernspielapparat.exe` on Windows). You can run it from the
+command line. You can move it anywhere you like to install it,
+the other files shipped with the executable are not required to
+run it.
 
 To make `fernspielapparat` available globally, you can add the
 containing directory to your `PATH` environment variable or
@@ -93,6 +128,9 @@ synthesis.
 
 Use `fernspielapparat --help` for an overview of available
 options.
+
+`fernspielapparat --serve` will open a remote control server
+available on all network interfaces on port `38397`.
 
 ## License
 The fernspielapparat project is licensed under the GPLv3.
