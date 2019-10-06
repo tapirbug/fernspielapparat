@@ -2,7 +2,7 @@
 Documentation and code of the _fernspielapparat_ runtime live here.
 
 _fernspielapparat_ is a story telling device that gives you a
-text adventure-like experience talking to retro phone.
+text adventure-like experience talking to a retro phone.
 
 Games on the _fernspielapparat_ are packaged into _phonebooks_ and
 the runtime loads and evaluates them. For this, it accesses
@@ -30,7 +30,11 @@ The only required setup is to install VLC first, the
 _weichspielapparat_ will take care of the rest.
 
 To learn more about the inner workings of the phonebook format,
-please read the [specification](doc/Phonebook Spec.md).
+please read the [specification](doc/phonebook_Spec.md).
+
+If you want to build additional hardware for the _fernspielapparat_
+ecosystem, you may be interested in the [fernspielctl specification](doc/fernspielctl_Spec.md), a protocol for remote control and event tracking
+on top of WebSockets.
 
 ### Installing
 So you want to install the runtime yourself? This may not be necessary
