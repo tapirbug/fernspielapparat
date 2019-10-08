@@ -73,8 +73,6 @@ terminal:
 
 #[test]
 fn deploy_and_then_observe_transition() {
-    fernspielapparat::log::init_logging(Some(3));
-
     // given
     let port = random_port();
 
@@ -89,7 +87,7 @@ fn deploy_and_then_observe_transition() {
         app.run().unwrap();
     });
 
-    let mut client = ClientBuilder::new(&format!("ws:/127.0.0.1:{port}", port = port))
+    let mut client = ClientBuilder::new(&format!("ws://127.0.0.1:{port}", port = port))
         .unwrap()
         .add_protocol("fernspielctl")
         .connect_insecure()
@@ -159,7 +157,7 @@ fn observe_transition_from_dial() {
         app.run().unwrap();
     });
     //std::thread::sleep(std::time::Duration::from_secs(5));
-    let client = ClientBuilder::new(&format!("ws:/127.0.0.1:{port}", port = port))
+    let client = ClientBuilder::new(&format!("ws://127.0.0.1:{port}/", port = port))
         .unwrap()
         .add_protocol("fernspielctl")
         .connect_insecure()

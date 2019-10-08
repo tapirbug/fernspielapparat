@@ -1,6 +1,6 @@
 [package]
 name = "fernspielapparat"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["krachzack <hello@phstadler.com>"]
 edition = "2018"
 build = "build.rs"

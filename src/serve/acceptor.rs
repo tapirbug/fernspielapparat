@@ -6,9 +6,9 @@ use super::ws::{WebSocketClient, WebSocketServer, WebSocketUpgrade};
 use crate::result::Result;
 use crate::serve::{FernspielEvent, Request};
 
-use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
+use crossbeam_channel::{bounded, Receiver, Sender, TrySendError, select};
 use failure::{bail, format_err};
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace};
 use std::thread::spawn;
 
 const WS_PROTOCOL: &str = "fernspielctl";
@@ -50,17 +50,36 @@ impl Acceptor {
     /// Keeps the acceptor running until the shutdown signal
     /// is received.
     fn run(&mut self, mut ws: WebSocketServer) {
-        if let Err(e) = ws.set_nonblocking(true) {
-            error!("failed to make non-blocking websockets server: {}", e);
-        }
+        let (accept_tx, accept_rx) = bounded(4);
 
-        // run until shutdown is called on server
-        while let Err(_) = self.shutdown_signal.try_recv() {
-            if let Ok(request) = ws.accept() {
-                let result = accept(request).and_then(|c| self.communicate(c));
-                if let Err(err) = result {
-                    warn!("failed to establish connection: {}", err)
+        spawn(move || {
+            loop {
+                if let Ok(request) = ws.accept() {
+                    if let Err(_) = accept_tx.send(request) {
+                        break;
+                    }
                 }
+            }
+        });
+
+        // run until shutdown signal received
+        loop {
+            select! {
+                // return with error when remote end hung up
+                recv(accept_rx) -> connection => {
+                    match connection {
+                        Ok(conn) => {
+                            if let Err(err) = accept(conn).and_then(|c| self.communicate(c)) {
+                                error!("could not accept connection {:?}", err);
+                            }
+                        },
+                        Err(e) =>  {
+                            debug!("accept recv error {:?}", e);
+                            break
+                        }
+                    }
+                },
+                recv(self.shutdown_signal) -> _ => break
             }
         }
 
