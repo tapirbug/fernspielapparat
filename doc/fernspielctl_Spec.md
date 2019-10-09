@@ -141,8 +141,8 @@ one of the strings `"start"`, `"transition"` or `"finish"`. Any other properties
 provide additional context, according to the event type.
 
 ### `type: "start"`
-Communicates that a phonebook has just been loaded starting from an initial
-state that is specified with the message. Not sent in the case of resets.
+Communicates that a phonebook has just been loaded and starts from an initial
+state that is specified with the message. Also sent in the case of resets.
 
 MUST also have the key `"initial"` on the root object, mapped to an object
 only holding a key `"id"`, mapped to the unique identifier of the initial
