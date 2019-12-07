@@ -1,0 +1,116 @@
+# reproduces issue #18, where a symbol causes a transition from
+# quiet to the talk state and immediately progresses to the next state.
+# every symbol should only be handled once.
+# derived from a file provided by thomas, with pause being marked as terminal
+# and states being renamed from UUIDs to something more descriptive.
+# also removed the timeout after zero seconds, which distracted a bit from the core problem
+initial: RING
+states:
+  PAUSE:
+    name: Pause
+    description: Does nothing for a while and rings again afterwards
+    sounds: []
+    ring: 0
+    terminal: true
+  RING:
+    name: Ring
+    description: ""
+    sounds: []
+    ring: 0.5
+    terminal: false
+  INTRODUCE:
+    name: Introduce
+    description: ""
+    sounds:
+      - 89119a50-910c-4baf-85c3-686382af5f9b
+    ring: 0
+    terminal: false
+  TALK:
+    name: talk
+    description: ""
+    sounds:
+      - 55f81463-3179-486b-8900-36ca37c46bff
+    ring: 0
+    terminal: false
+    id: TALK
+  QUIET:
+    name: quiet
+    description: ""
+    sounds: []
+    ring: 0
+    terminal: false
+    id: QUIET
+transitions:
+  PAUSE:
+    timeout:
+      after: 60
+      to: RING
+  RING:
+    timeout:
+      after: 1.5
+      to: RING
+  INTRODUCE:
+    timeout:
+      after: 5
+      to: INTRODUCE
+    dial:
+      "1": TALK
+  TALK:
+    dial:
+      "1": QUIET
+  QUIET:
+    dial:
+      "1": TALK
+  any:
+    pick_up: INTRODUCE
+    hang_up: PAUSE
+vendor:
+  fernspieleditor:
+    version: 1
+    focusedStateId: PAUSE
+    extensionProperties:
+      states:
+        any:
+          network:
+            position:
+              x: 100
+              y: 100
+        PAUSE:
+          network:
+            position:
+              x: 300
+              y: 100
+        RING:
+          network:
+            position:
+              x: 500
+              y: 100
+        INTRODUCE:
+          network:
+            position:
+              x: 225
+              y: 274
+        TALK:
+          network:
+            position:
+              x: 487
+              y: 273
+        QUIET:
+          network:
+            position:
+              x: 311
+              y: 504
+sounds:
+  89119a50-910c-4baf-85c3-686382af5f9b:
+    name: Introduction
+    loop: true
+    speech: Hallo du! Ich bin's, dein Fernseher. Das Konsumieren von Medien über
+      Jahrzehnte hat mir ein Bewusstsein beschert. Willst du mein Freund sein?
+    volume: 0.9
+    backoff: 0.2
+  55f81463-3179-486b-8900-36ca37c46bff:
+    name: talk1
+    loop: false
+    speech: Ich habe Hunger.
+    volume: 0
+    backoff: 0
